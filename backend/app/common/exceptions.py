@@ -1,3 +1,6 @@
+from email import errors
+from os import error
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from app.common.response import Response
@@ -40,9 +43,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """
     参数异常处理器
     """
+    errors = []
+    for e in exc.errors():
+        field = e["loc"][-1] if e["loc"] else "unknown"
+        errors.append({"field": field, "message": e["msg"]})
+
     return JSONResponse(
         status_code=422,
-        content=Response.error(code=422, message="请求参数校正错误").model_dump(),
+        content=Response.error(
+            code=422, message="请求参数校验错误", data=errors
+        ).model_dump(),
     )
 
 

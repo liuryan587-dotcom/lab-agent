@@ -5,7 +5,7 @@ from app.api import api
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
-from app.common.excepions import (
+from app.common.exceptions import (
     BusinessException,
     business_exception_handler,
     http_exception_handler,

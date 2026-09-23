@@ -4,8 +4,8 @@
       <h1 style="font-size: 28px">实验室预约系统</h1>
       <div style="margin-top: 5px; margin-bottom: 30px">基于Agent智能预约系统</div>
 
-      <el-form :model="form" label-width="0px" style="width: 100%">
-        <el-form-item>
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="0px" style="width: 100%">
+        <el-form-item prop="username">
           <el-input
             size="large"
             v-model="form.username"
@@ -13,7 +13,7 @@
             :prefix-icon="User"
           />
         </el-form-item>
-        <el-form-item>
+        <el-form-item prop="password">
           <el-input
             type="password"
             size="large"
@@ -57,23 +57,40 @@ const form = reactive({
   password: ''
 })
 
+const formRef = ref(null)
+
+const rules = {
+  username: [
+    { required: true, message: '请输入账号', trigger: 'blur' },
+    { min: 3, max: 20, message: '账号长度需在3到20个字符之间', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 3, max: 50, message: '密码长度需在3到50个字符之间', trigger: 'blur' }
+  ]
+}
+
 const loadingValue = ref(false)
 
 const login = async () => {
-  loadingValue.value = true
+  formRef.value.validate(async (valid) => {
+    if (!valid) return
 
-  try {
-    const res = await loginApi(form)
+    loadingValue.value = true
 
-    saveLoginData(res.data)
-    // 这里还需要保存 res.data.token
-    ElMessage.success('登录成功')
-    await router.push('/manager/home')
-  } catch (error) {
-    // 错误提示已经由 request.js 显示
-  } finally {
-    loadingValue.value = false
-  }
+    try {
+      const res = await loginApi(form)
+
+      saveLoginData(res.data)
+      // 这里还需要保存 res.data.token
+      ElMessage.success('登录成功')
+      await router.push('/manager/home')
+    } catch (error) {
+      // 错误提示已经由 request.js 显示
+    } finally {
+      loadingValue.value = false
+    }
+  })
 }
 </script>
 

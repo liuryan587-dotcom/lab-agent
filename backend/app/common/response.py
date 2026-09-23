@@ -12,5 +12,5 @@ class Response(BaseModel):
         return cls(code=200, message=message, data=data)
 
     @classmethod
-    def error(cls, code: int = 400, message: str = "请求失败"):
-        return cls(code=code, message=message)
+    def error(cls, code: int = 400, message: str = "请求失败", data: Any = None):
+        return cls(code=code, message=message, data=data)
