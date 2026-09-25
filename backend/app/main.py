@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from app.config import UPLOAD_DIR
 from app.models.user import User
 from app.database import Base, engine
 from app.api import api
@@ -40,6 +42,9 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 # 全局的异常兜底，必须放在最后注册
 app.add_exception_handler(Exception, global_exception_handler)
+
+# 挂载静态的文件目录
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
 @app.get("/")

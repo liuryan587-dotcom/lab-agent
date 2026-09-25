@@ -14,3 +14,10 @@ class Response(BaseModel):
     @classmethod
     def error(cls, code: int = 400, message: str = "请求失败", data: Any = None):
         return cls(code=code, message=message, data=data)
+
+
+class PageResponse(BaseModel):
+    """分页的返回结果"""
+
+    list: Any = []
+    total: int = 0
