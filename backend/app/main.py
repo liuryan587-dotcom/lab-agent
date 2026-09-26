@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.config import UPLOAD_DIR
 from app.models.user import User
+from app.models.lab import Lab
 from app.database import Base, engine
 from app.api import api
 from fastapi import FastAPI, HTTPException
@@ -34,6 +35,7 @@ app.add_middleware(
 )
 
 app.include_router(api)
+
 
 # 注册异常处理器
 app.add_exception_handler(BusinessException, business_exception_handler)
