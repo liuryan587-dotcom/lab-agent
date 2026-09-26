@@ -66,6 +66,9 @@
 import router from '@/router'
 import { logout } from '@/utils/auth'
 import { Menu as IconMenu, Location, Setting, House } from '@element-plus/icons-vue'
+import { useUser } from '@/utils/user'
+const { userInfo } = useUser()
+
 const handleCommand = (command) => {
   if (command === 'logout') {
     logout()

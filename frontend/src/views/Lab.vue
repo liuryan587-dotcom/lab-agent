@@ -143,6 +143,8 @@ import { createLabApi, deleteLabApi, getLabPageList, updateLabApi } from '@/api/
 import { uploadFileApi } from '@/api/file'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUser } from '@/utils/user'
+const { userInfo } = useUser()
 
 const params = reactive({
   page: 1,
