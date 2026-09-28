@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "bcrypt==5.0.0",
+    "cryptography==50.0.1",
     "fastapi==0.115.13",
     "pydantic-settings==2.7.1",
     "pyjwt==2.13.0",

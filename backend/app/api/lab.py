@@ -1,4 +1,3 @@
-from pkgutil import get_data
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.common.response import Response
