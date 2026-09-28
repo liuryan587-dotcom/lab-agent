@@ -23,6 +23,31 @@ const router = createRouter({
           path: 'user',
           name: 'User',
           component: () => import('../views/User.vue')
+        },
+        {
+          path: 'equipment',
+          name: 'Equipment',
+          component: () => import('@/views/Equipment.vue')
+        },
+        {
+          path: 'lablist',
+          name: 'LabList',
+          component: () => import('../views/LabList.vue')
+        },
+        {
+          path: 'profile',
+          name: 'Profile',
+          component: () => import('../views/Profile.vue')
+        },
+        {
+          path: 'password',
+          name: 'Password',
+          component: () => import('../views/Password.vue')
+        },
+        {
+          path: 'lab-equipment',
+          name: 'LabEquipment',
+          component: () => import('../views/LabEquipment.vue')
         }
       ]
     },

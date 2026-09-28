@@ -16,7 +16,7 @@ def get_lab_list(
     page: int = 1,
     page_size: int = 10,
     keywords: str | None = None,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     res = lab_service.get_lab_page_list(db, page, page_size, keywords)
@@ -41,6 +41,16 @@ def update_user(
     db: Session = Depends(get_db),
 ):
     res = lab_service.update_lab(db, lab_id, data)
+    return Response.success(data=res)
+
+
+@router.get("/{lab_id}")
+def get_lab(
+    lab_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    res = lab_service.get_lab(db, lab_id)
     return Response.success(data=res)
 
 

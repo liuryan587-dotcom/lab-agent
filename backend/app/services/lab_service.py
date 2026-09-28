@@ -7,10 +7,6 @@ from app.utils.password import verify_password, hash_password
 from app.common.response import PageResponse
 
 
-def get_lab_info(lab: Lab):
-    return LabResponse.model_validate(lab)
-
-
 def get_lab_page_list(
     db: Session, page: int, page_size: int, keywords: str | None = None
 ):
@@ -30,6 +26,13 @@ def get_lab_page_list(
     return PageResponse(
         list=[LabResponse.model_validate(item) for item in items], total=total
     )
+
+
+def get_lab(db: Session, lab_id: int):
+    lab = db.query(Lab).filter(Lab.id == lab_id).first()
+    if not lab:
+        raise BusinessException(message="实验室不存在")
+    return LabResponse.model_validate(lab)
 
 
 def create_lab(db: Session, data: LabCreateRequest):

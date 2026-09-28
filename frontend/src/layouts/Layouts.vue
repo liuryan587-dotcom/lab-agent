@@ -9,22 +9,21 @@
           background-color: #fff;
         "
       >
-        <div
-          style="flex: 1; display: flex; align-items: center; font-size: 24px; font-weight: bold"
-        >
+        <div style="flex: 1; display: flex; align-items: center; font-size: 24px; font-weight: bold">
           <img src="@/assets/imgs/logo.png" style="width: 40px; height: 40px" />
           <div style="margin-left: 5px">实验室预约系统</div>
         </div>
         <el-dropdown trigger="click" @command="handleCommand">
           <div class="user-area">
-            <img src="@/assets/imgs/logo.png" class="user-avatar" />
-            <span>管理员</span>
-            <el-icon><ArrowDown /></el-icon>
+            <img :src="userInfo?.avatar" alt="" style="width: 30px; border-radius: 50%" />
+            <div style="margin-left: 3px">{{ userInfo?.name }}</div>
           </div>
 
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="logout"> 退出登录 </el-dropdown-item>
+                <el-dropdown-item command="profile">个人信息</el-dropdown-item>
+                <el-dropdown-item command="password">修改密码</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -40,11 +39,15 @@
               <el-icon><icon-menu /></el-icon>
               <span>系统首页</span>
             </el-menu-item>
+            <el-menu-item index="/manager/lablist" v-if="userInfo?.role === 'student'">
+              <el-icon><OfficeBuilding /></el-icon>
+              <span>实验室列表</span>
+            </el-menu-item>
             <el-menu-item v-if="userInfo?.role === 'admin'" index="/manager/lab">
               <el-icon><House /></el-icon>
               <span>实验室管理</span>
             </el-menu-item>
-            <el-menu-item index="/manager/equipment">
+            <el-menu-item v-if="userInfo?.role === 'admin'" index="/manager/equipment"">
               <el-icon><Setting /></el-icon>
               <span>设备管理</span>
             </el-menu-item>
@@ -65,14 +68,18 @@
 <script setup>
 import router from '@/router'
 import { logout } from '@/utils/auth'
-import { Menu as IconMenu, Location, Setting, House } from '@element-plus/icons-vue'
+import { Menu as IconMenu, House, Setting, User, OfficeBuilding } from '@element-plus/icons-vue'
 import { useUser } from '@/utils/user'
 const { userInfo } = useUser()
 
 const handleCommand = (command) => {
-  if (command === 'logout') {
+   if (command === 'profile') {
+    router.push('/manager/profile')
+  } else if (command === 'password') {
+    router.push('/manager/password')
+  } else if (command === 'logout') {
     logout()
-    router.replace('/login')
+    router.push('/login')
   }
 }
 </script>
