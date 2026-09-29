@@ -63,6 +63,10 @@
               <el-icon><DocumentChecked /></el-icon>
               <span>预约审核</span>
             </el-menu-item>
+            <el-menu-item index="/manager/ai-chat">
+              <el-icon><ChatDotRound /></el-icon>
+              <span>AI智能助手</span>
+            </el-menu-item>
           </el-menu>
         </el-aside>
         <el-main style="background-color: lightgray">
@@ -76,7 +80,7 @@
 <script setup>
 import router from '@/router'
 import { logout } from '@/utils/auth'
-import {  Menu as IconMenu, House, Setting, User, OfficeBuilding, Tickets, DocumentChecked  } from '@element-plus/icons-vue'
+import {  Menu as IconMenu, House, Setting, User, OfficeBuilding, Tickets, DocumentChecked, ChatDotRound   } from '@element-plus/icons-vue'
 import { useUser } from '@/utils/user'
 const { userInfo } = useUser()
 

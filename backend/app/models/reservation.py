@@ -1,7 +1,5 @@
-from statistics import quantiles
-
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Integer, String, ForeignKey
+from sqlalchemy import String, ForeignKey
 from app.models.lab import Lab
 from app.database import Base
 from app.models.user import User

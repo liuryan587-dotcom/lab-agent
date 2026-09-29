@@ -8,6 +8,7 @@ dependencies = [
     "bcrypt==5.0.0",
     "cryptography==50.0.1",
     "fastapi==0.115.13",
+    "openai==3.14.1",
     "pydantic-settings==2.7.1",
     "pyjwt==2.13.0",
     "pymysql==1.1.1",
