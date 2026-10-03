@@ -5,7 +5,7 @@ from app.utils.password import verify_password, hash_password
 from app.utils.jwt import create_access_token
 from app.common.exceptions import BusinessException
 from app.schemas.user import UserResponse
-from pymysql import IntegrityError
+from sqlalchemy.exc import IntegrityError
 
 
 def login(db: Session, data: LoginRequest):

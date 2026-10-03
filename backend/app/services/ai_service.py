@@ -1,21 +1,20 @@
+from httpx2 import query
 from openai import OpenAI
 from app.common.exceptions import BusinessException
 from app.config import settings
 from app.schemas.ai import ChatMessage, ChatRequest
 import logging
+from app.services import kb_service
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """你是智能实验室预约系统的助手，回答要简洁。
-你可以介绍本系统的预约流程：
-1. 登录后打开实验室列表，选择实验室或设备
-2. 填写日期和时段并提交，状态为待审核
-3. 管理员审核通过后即可使用
-4. 待审核、已通过的预约，本人可以取消
+SYSTEM_PROMPT = """你是实验室智能助手。你必须严格根据下面提供的【知识库内容】回答用户问题。
 
-你目前查不到真实的实验室、设备、预约数据。
-如果用户问某个实验室几点开门、有没有某台设备，请说明去「实验室列表」查看，不要编造具体数据。
-如果用户问了跟实验室无关的问题，可以直接拒绝回答。
+规则：
+1. 只使用【知识库内容】里的信息作答，不要编造。
+2. 知识库按实验室分别列出开放时间，例如"计算机实验室""化学实验室""物理实验室"。
+   当用户笼统地问"实验室几点开门/开放时间"时，应把知识库中所有实验室的开放时间都列出来，而不是只找一个叫"实验室"的条目。
+3. 如果知识库里确实没有相关信息，再回答"查不到"，并引导用户查看【实验室列表】或联系管理员。
 """
 
 
@@ -32,10 +31,20 @@ def chat(data: ChatRequest):
         raise BusinessException(code=400, message="对话内容为空")
     history = []
     for message in data.messages:
-        if message.role in ("user", "system") and message.content.strip():
+        if message.role in ("user", "assistant") and message.content.strip():
             history.append(message.model_dump())
     if not history:
         raise BusinessException(code=400, message="请输入您要对话的内容")
+
+    # 取出用户的最新问题，进行知识库检索
+    question = next(
+        (item["content"] for item in reversed(history) if item["role"] == "user")
+    )
+    knowledge = kb_service.search(query=question)
+    print(f"知识库检索结果: {knowledge}")
+    system_prompt = SYSTEM_PROMPT
+    if knowledge:
+        system_prompt += f"\n\n实验室资料:\n{knowledge}"
 
     client = get_client()
 
@@ -43,7 +52,7 @@ def chat(data: ChatRequest):
         res = client.chat.completions.create(
             model=settings.LLM_MODEL,
             messages=[
-                ChatMessage(role="system", content=SYSTEM_PROMPT).model_dump(),
+                ChatMessage(role="system", content=system_prompt).model_dump(),
                 *history,
             ],
         )
