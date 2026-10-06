@@ -19,7 +19,10 @@ def get_lab_list(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    res = lab_service.get_lab_page_list(db, page, page_size, keywords)
+    if current_user.role == "student":
+        res = lab_service.get_lab_page_list(db, page, page_size, keywords, status=1)
+    else:
+        res = lab_service.get_lab_page_list(db, page, page_size, keywords)
     return Response.success(data=res)
 
 

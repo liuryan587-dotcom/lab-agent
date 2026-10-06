@@ -1,3 +1,6 @@
+import traceback
+
+from fastapi import logger
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.common.exceptions import BusinessException
@@ -88,10 +91,18 @@ def create_reservation(db: Session, current_user: User, data: ReservationCreateR
         remark=data.remark,
         status=0,
     )
-    db.add(reservation_model)
-    db.commit()
-    db.refresh(reservation_model)  # 如果需要返回这条记录的 ID，建议加上这行
-    return reservation_model  # 建议返回创建的对象
+    try:
+        db.add(reservation_model)
+        db.commit()
+        db.refresh(reservation_model)  # 如果需要返回这条记录的 ID，建议加上这行
+        return reservation_model  # 建议返回创建的对象
+    except BusinessException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("创建预约失败")
+        raise BusinessException(code=400, message="预约失败,请稍后再试")
 
 
 def get_reservation_page_list(

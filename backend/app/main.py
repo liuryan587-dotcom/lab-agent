@@ -1,5 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
+import trace
+import traceback
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.config import UPLOAD_DIR
@@ -11,7 +13,7 @@ from app.api import api
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
-from app.services import reservation_service
+from app.services import kb_service, reservation_service
 from app.common.exceptions import (
     BusinessException,
     business_exception_handler,
@@ -26,6 +28,10 @@ Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        await asyncio.to_thread(kb_service.warmup)
+    except Exception:
+        traceback.print_exc()
     task = asyncio.create_task(
         reservation_service.run_expire_scan()
     )  # 启动项目开启异步的扫描任务

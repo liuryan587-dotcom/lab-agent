@@ -8,7 +8,11 @@ from app.common.response import PageResponse
 
 
 def get_lab_page_list(
-    db: Session, page: int, page_size: int, keywords: str | None = None
+    db: Session,
+    page: int,
+    page_size: int,
+    keywords: str | None = None,
+    status: int | None = None,
 ):
 
     query = db.query(Lab)
@@ -16,6 +20,9 @@ def get_lab_page_list(
         query = query.filter(
             or_(Lab.name.ilike(f"%{keywords}%"), Lab.location.ilike(f"%{keywords}%"))
         )
+    if status is not None:
+        query = query.filter(Lab.status == status)
+
     total = query.count()
     items = (
         query.order_by(Lab.id.desc())
