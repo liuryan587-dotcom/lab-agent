@@ -6,13 +6,25 @@ from app.schemas.equipment import (
     EquipmentResponse,
     EquipmentUpdateRequest,
 )
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.utils.password import verify_password, hash_password
 from app.common.response import PageResponse
 
 
+def to_response(equipment: Equipment) -> EquipmentResponse:
+    """统一出口：把「所属实验室」名称一并带上。
+
+    lab_name 是 schema 里的可选字段，model_validate 不会自动填，
+    之前只有 create_equipment 手工赋过值，导致列表和详情里这一列永远是 null，
+    前端「所属实验室」列一直是空白。
+    """
+    res = EquipmentResponse.model_validate(equipment)
+    res.lab_name = equipment.lab.name if equipment.lab else None
+    return res
+
+
 def get_equipment_info(equipment: Equipment):
-    return EquipmentResponse.model_validate(equipment)
+    return to_response(equipment)
 
 
 def get_equipment_page_list(
@@ -23,7 +35,8 @@ def get_equipment_page_list(
     lab_id: int | None = None,
 ):
 
-    query = db.query(Equipment)
+    # joinedload 预加载实验室，避免逐行懒加载造成 N+1
+    query = db.query(Equipment).options(joinedload(Equipment.lab))
     if lab_id:
         query = query.filter(Equipment.lab_id == lab_id)
     if keywords:
@@ -35,9 +48,7 @@ def get_equipment_page_list(
         .limit(page_size)
         .all()
     )
-    return PageResponse(
-        list=[EquipmentResponse.model_validate(item) for item in items], total=total
-    )
+    return PageResponse(list=[to_response(item) for item in items], total=total)
 
 
 def create_equipment(db: Session, data: EquipmentCreateRequest):
@@ -49,28 +60,31 @@ def create_equipment(db: Session, data: EquipmentCreateRequest):
     db.add(equipment)
     db.commit()
     db.refresh(equipment)
-    res = EquipmentResponse.model_validate(equipment)
-    res.lab_name = equipment.lab.name if equipment.lab else None
-    return res
+    return to_response(equipment)
 
 
 def update_equipment(db: Session, equipment_id: int, data: EquipmentUpdateRequest):
-    """更新实验室"""
-    equipment = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    """更新设备"""
+    equipment = (
+        db.query(Equipment)
+        .options(joinedload(Equipment.lab))
+        .filter(Equipment.id == equipment_id)
+        .first()
+    )
     if not equipment:
-        raise BusinessException(code=400, message="用户不存在")
+        raise BusinessException(code=400, message="设备不存在")
     payload = data.model_dump(exclude_none=True)
     for field, value in payload.items():
         setattr(equipment, field, value)
     db.commit()
     db.refresh(equipment)
-    return EquipmentResponse.model_validate(equipment)
+    return to_response(equipment)
 
 
 def delete_equipment(db: Session, equipment_id: int):
-    """删除实验室"""
+    """删除设备"""
     equipment = db.query(Equipment).filter(Equipment.id == equipment_id).first()
     if not equipment:
-        raise BusinessException(code=400, message="该实验室不存在")
+        raise BusinessException(code=400, message="该设备不存在")
     db.delete(equipment)
     db.commit()

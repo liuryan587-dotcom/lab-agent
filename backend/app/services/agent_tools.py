@@ -5,7 +5,7 @@ from app.models.user import User
 import json
 from langchain_core.tools import tool
 from app.services import kb_service, equipment_service, lab_service, reservation_service
-from app.models.reservation import Reservation
+from app.schemas.reservation import ReservationCreateRequest
 
 
 def build_tools(db: Session, current_user: User):
@@ -75,7 +75,10 @@ def build_tools(db: Session, current_user: User):
     ) -> str:
         """创建预约单预约实验室或设备"""
         try:
-            data = Reservation(
+            # 这里要传 pydantic 的请求对象，而不是 ORM 模型：
+            # ORM 模型的 date/start_time/end_time 现在是 DATE/TIME 类型，
+            # 直接塞原始字符串会埋下类型不一致的隐患
+            data = ReservationCreateRequest(
                 lab_id=lab_id,
                 equipment_id=equipment_id,
                 date=date,

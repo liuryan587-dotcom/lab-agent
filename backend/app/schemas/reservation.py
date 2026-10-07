@@ -1,4 +1,7 @@
-from pydantic import BaseModel, ConfigDict
+from datetime import date as date_type
+from datetime import time as time_type
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class ReservationCreateRequest(BaseModel):
@@ -26,6 +29,23 @@ class ReservationResponse(BaseModel):
     status: int
 
     model_config = ConfigDict(from_attributes=True)
+
+    # date / start_time / end_time 在库里已经是 DATE / TIME 列，
+    # 取出来是 datetime.date / datetime.time，这里统一转回字符串，
+    # 保证给前端的 JSON 结构和以前完全一致（"2026-10-08" / "14:00"）
+    @field_validator("date", mode="before")
+    @classmethod
+    def _format_date(cls, value):
+        if isinstance(value, date_type):  # datetime 是 date 的子类，一并覆盖
+            return value.strftime("%Y-%m-%d")
+        return value
+
+    @field_validator("start_time", "end_time", mode="before")
+    @classmethod
+    def _format_time(cls, value):
+        if isinstance(value, time_type):
+            return value.strftime("%H:%M")
+        return value
 
 
 class AuditReservationRequest(BaseModel):
