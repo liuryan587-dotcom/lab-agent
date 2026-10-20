@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str
     LLM_MODEL: str
 
+    LOG_LEVEL: str = "INFO"
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env", env_file_encoding="utf-8"
     )

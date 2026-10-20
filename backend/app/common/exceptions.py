@@ -1,11 +1,11 @@
-from email import errors
-from os import error
-
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from app.common.response import Response
 from fastapi.exceptions import HTTPException
 from fastapi.exceptions import RequestValidationError
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class BusinessException(Exception):
@@ -13,7 +13,7 @@ class BusinessException(Exception):
     自定义的业务异常类
     """
 
-    def __init__(self, code: int, message: str):
+    def __init__(self, message: str, code: int = 400):
         self.message = message
         self.code = code
         super().__init__(message)
@@ -60,6 +60,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     """
     全局异常处理器
     """
+    logger.error(
+        "未处理异常 | %s %s | %s", request.method, request.url.path, exc, exc_info=exc
+    )
     return JSONResponse(
         status_code=500,
         content=Response.error(code=500, message="服务器内部错误").model_dump(),

@@ -1,4 +1,3 @@
-from pkgutil import get_data
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.common.response import Response
@@ -6,7 +5,6 @@ from app.models.user import User
 from app.dependencies.auth import get_current_admin, get_current_user
 from app.schemas.user import (
     UserCreateRequest,
-    UserResponse,
     UserUpdatePasswordRequest,
     UserUpdateRequest,
 )

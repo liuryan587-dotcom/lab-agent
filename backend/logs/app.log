@@ -1,0 +1,44 @@
+2026-10-13 15:39:18,763 | INFO | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2026-10-13 15:56:42,829 | INFO | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2026-10-13 15:59:41,592 | ERROR | app.common.exceptions | 未处理异常 | GET /uploads/<那个文件名>.png | [WinError 123] 文件名、目录名或卷标语法不正确。: 'D:\\workspace\\python_project\\lab-agent\\backend\\uploads\\<那个文件名>.png'
+Traceback (most recent call last):
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\routing.py", line 460, in handle
+    await self.app(scope, receive, send)
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\staticfiles.py", line 98, in __call__
+    response = await self.get_response(path, scope)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\staticfiles.py", line 125, in get_response
+    raise exc
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\staticfiles.py", line 117, in get_response
+    full_path, stat_result = await anyio.to_thread.run_sync(self.lookup_path, path)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "D:\workspace\python_project\lab-agent\backend\.venv\Lib\site-packages\starlette\staticfiles.py", line 164, in lookup_path
+    return full_path, os.stat(full_path)
+                      ~~~~~~~^^^^^^^^^^^
+OSError: [WinError 123] 文件名、目录名或卷标语法不正确。: 'D:\\workspace\\python_project\\lab-agent\\backend\\uploads\\<那个文件名>.png'

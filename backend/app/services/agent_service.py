@@ -1,5 +1,4 @@
 import logging
-
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -11,7 +10,6 @@ from app.schemas.ai import ChatRequest
 from app.services import agent_tools
 from app.config import settings
 import traceback
-from collections.abc import Iterator
 from typing import Any
 
 # 注意：from fastapi import logger 拿到的是「模块」而不是 logger 实例，

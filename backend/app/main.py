@@ -1,19 +1,19 @@
 import asyncio
 from contextlib import asynccontextmanager
-import trace
 import traceback
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.config import UPLOAD_DIR
-from app.models.user import User
-from app.models.lab import Lab
-from app.models.equipment import Equipment
 from app.database import Base, engine
 from app.api import api
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
 from app.services import kb_service, reservation_service
+from app.common.logger import setup_logging
+
+setup_logging()
+
 from app.common.exceptions import (
     BusinessException,
     business_exception_handler,

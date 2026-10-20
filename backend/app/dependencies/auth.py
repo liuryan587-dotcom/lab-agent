@@ -28,6 +28,10 @@ def get_current_user(
         )
     # 从数据库根据用户ID查询用户信息
     user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="账户不存在或已注销"
+        )
     if user.status != 1:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="用户被禁用"
