@@ -9,7 +9,6 @@ from app.models.user import User
 from app.schemas.ai import ChatRequest
 from app.services import agent_tools
 from app.config import settings
-import traceback
 from typing import Any
 
 # 注意：from fastapi import logger 拿到的是「模块」而不是 logger 实例，
@@ -180,40 +179,39 @@ def build_agent(db: Session, current_user: User):
     return graph.compile()
 
 
-def run_agent(db: Session, current_user: User, data: ChatRequest):
-    """大模型对话"""
-    if not data.messages:
-        raise BusinessException(code=400, message="对话内容为空")
-    history = []
-    for message in data.messages:
-        if message.role == "user" and message.content.strip():
-            history.append(HumanMessage(content=message.content.strip()))
-        elif message.role == "assistant" and message.content.strip():
-            history.append(AIMessage(content=message.content.strip()))
-    if not history:
-        raise BusinessException(message="请输入您要对话的内容")
-    agent = build_agent(db, current_user)
-    try:
-        result = agent.invoke(
-            {"messages": [SystemMessage(content=SYSTEM_PROMPT), *history]},
-            config={"recursion_limit": 10},
-        )  # 设置对话循环的上限是10轮
-    except BusinessException:
-        raise
-    except Exception as e:
-        traceback.print_exc()
-        raise BusinessException(code=400, message=f"大模型调用失败:{str(e)}")
+# def run_agent(db: Session, current_user: User, data: ChatRequest):
+#     """大模型对话"""
+#     if not data.messages:
+#         raise BusinessException(code=400, message="对话内容为空")
+#     history = []
+#     for message in data.messages:
+#         if message.role == "user" and message.content.strip():
+#             history.append(HumanMessage(content=message.content.strip()))
+#         elif message.role == "assistant" and message.content.strip():
+#             history.append(AIMessage(content=message.content.strip()))
+#     if not history:
+#         raise BusinessException(message="请输入您要对话的内容")
+#     agent = build_agent(db, current_user)
+#     try:
+#         result = agent.invoke(
+#             {"messages": [SystemMessage(content=SYSTEM_PROMPT), *history]},
+#             config={"recursion_limit": 10},
+#         )  # 设置对话循环的上限是10轮
+#     except BusinessException:
+#         raise
+#     except Exception as e:
+#         raise BusinessException(code=400, message=f"大模型调用失败:{str(e)}")
 
-    messages = result.get("messages") or []
-    if not messages:
-        raise BusinessException(code=400, message="大模型没有任何返回")
-    for message in reversed(messages):
-        if isinstance(message, AIMessage) and message.content.strip():
-            content = message.content.strip()
-            if isinstance(content, list):
-                content = "".join(
-                    part.get("text", "") if isinstance(part, dict) else str(part)
-                    for part in content
-                )
-            if str(content).strip():
-                return str(content).strip()
+#     messages = result.get("messages") or []
+#     if not messages:
+#         raise BusinessException(code=400, message="大模型没有任何返回")
+#     for message in reversed(messages):
+#         if isinstance(message, AIMessage) and message.content.strip():
+#             content = message.content.strip()
+#             if isinstance(content, list):
+#                 content = "".join(
+#                     part.get("text", "") if isinstance(part, dict) else str(part)
+#                     for part in content
+#                 )
+#             if str(content).strip():
+#                 return str(content).strip()

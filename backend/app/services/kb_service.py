@@ -92,7 +92,6 @@ def search(query: str):
             continue
         name = metas.get("source") or ""
         score_parts.append({"score": score, "content": f"[{name}]\n{doc}"})
-    print(f"检索出来的 score_parts：{score_parts}")
     score_parts.sort(key=lambda x: x["score"], reverse=True)
     final_parts = [item["content"] for item in score_parts[:2]]
     return "\n\n".join(final_parts)

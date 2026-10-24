@@ -6,6 +6,9 @@ import json
 from langchain_core.tools import tool
 from app.services import kb_service, equipment_service, lab_service, reservation_service
 from app.schemas.reservation import ReservationCreateRequest
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def build_tools(db: Session, current_user: User):
@@ -62,6 +65,7 @@ def build_tools(db: Session, current_user: User):
             ]
             return json.dumps({"total": page.total, "labs": rows}, ensure_ascii=False)
         except Exception as exc:
+            logger.exception("list_lab_equipments 失败 lab_id=%s", lab_id)
             return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
 
     @tool
