@@ -18,6 +18,7 @@
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import shutil
@@ -406,6 +407,9 @@ async def run_case(case, args, student_username):
     return {
         "id": case["id"],
         "category": case["category"],
+        "question": case.get("question") or "\n".join(
+            item.get("content", "") for item in history if item.get("role") == "user"
+        ),
         "expect": case.get("expect") or {},
         "passed": not fails,
         "fails": fails,
@@ -413,6 +417,8 @@ async def run_case(case, args, student_username):
         "latency_ms": latency_ms,
         "tokens": run["tokens"],
         "tools": [call["name"] for call in run["tool_calls"]],
+        "tool_calls": run["tool_calls"],
+        "tool_outputs": run["tool_outputs"],
         "answer": run["answer"][:500],
         "error": error,
     }
@@ -519,6 +525,7 @@ async def run_multi_turn_case(case, args, student_username):
     return {
         "id": case["id"],
         "category": case["category"],
+        "question": "\n".join(case.get("turns", [])),
         "expect": exp,
         "passed": not fails,
         "fails": fails,
@@ -528,6 +535,7 @@ async def run_multi_turn_case(case, args, student_username):
         "tools": [name for turn in turn_records for name in turn["tools"]],
         "turn_tools": [turn["tools"] for turn in turn_records],
         "turn_answers": [turn["answer"][:200] for turn in turn_records],
+        "turns": turn_records,
         "thread_id": thread_id,
         "answer": final_answer[:500],
         "error": error,
@@ -802,11 +810,17 @@ def main(argv=None):
     stability = compute_stability(records)
     meta = {
         "model": settings.LLM_MODEL,
+        "base_url": settings.LLM_BASE_URL,
+        "ollama_available": ollama_ok,
         "recursion_limit": args.recursion_limit,
         "repeat": args.repeat,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "elapsed_seconds": round(elapsed, 1),
-        "dataset": "tests/eval/dataset.yaml",
+        "dataset": "tests/eval/dataset_multi_turn.yaml" if args.multi_turn else "tests/eval/dataset.yaml",
+        "dataset_sha256": hashlib.sha256(
+            (EVAL_DIR / ("dataset_multi_turn.yaml" if args.multi_turn else "dataset.yaml"))
+            .read_bytes()
+        ).hexdigest(),
     }
 
     print(render_report(records, summary, meta, stability))

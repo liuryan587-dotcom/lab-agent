@@ -209,6 +209,8 @@ cd backend
 
 已有一轮记录结果：30 条样本 × 3 轮全部通过；工具选择准确率 100%，检索命中率 100%，系统写安全率 100%。详细口径、样本设计和限制见 [backend/tests/eval/README.md](backend/tests/eval/README.md)。
 
+可直接查看 [Agent 评估 HTML 报告](docs/agent-eval-report.html)。该报告由 2026-10-27 的历史 JSON 生成；老结果没有保存工具参数和 Ollama 状态，因此相应字段会明确标为未记录。后续评估可用 `backend/scripts/render_eval_report.py` 从新 JSON 生成完整明细报告。
+
 ## 验证命令
 
 前端生产构建：

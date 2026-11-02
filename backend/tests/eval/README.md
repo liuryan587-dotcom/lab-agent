@@ -12,6 +12,7 @@ tests/eval/
 ├── seed.py         评估库的种子数据（固定 id，每次 reset 重建）
 ├── runner.py       执行 + 断言 + 指标 + 报告
 ├── results/        每次运行的结果 json（不进 git）
+├── ../../scripts/render_eval_report.py  从 JSON 生成独立 HTML 报告
 └── .cache/         评估用 SQLite 库（不进 git）
 ```
 
@@ -50,8 +51,7 @@ cd backend
 
 runner 启动时会检查 `sys.prefix`，用错解释器直接退出并提示上面的命令。
 
-> 暂时不要用 `uv run` / `uv sync`：`pyproject.toml` 里还没声明
-> `langchain-openai` 和 `langgraph`，uv 同步时可能把它们从 `.venv` 里删掉。
+项目依赖已写入 `pyproject.toml` 和 `uv.lock`，可以用 `uv sync` 安装；评估命令仍建议显式使用项目虚拟环境解释器。
 
 前置条件：
 
@@ -342,6 +342,18 @@ messages:
 ```powershell
 .\.venv\Scripts\python.exe tests\eval\runner.py --multi-turn
 ```
+
+### HTML 报告
+
+runner 的 JSON 会保留模型、数据集 SHA-256、Ollama 状态和逐样本执行明细。评估结束后可以生成一个无需服务器的独立 HTML 文件：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\render_eval_report.py tests\eval\results\<结果文件>.json
+```
+
+默认 HTML 与 JSON 同目录、同文件名。也可以通过 `--output ..\docs\agent-eval-report.html` 指定位置。报告展示按能力和类别的统计、跳过/失败数量、运行配置，以及每条样本的输入、断言、工具参数、工具输出、回答、错误、耗时和 token。
+
+旧 JSON 缺少问题文本、工具参数或运行环境字段时，报告会从当前数据集补问题文本，并把其他缺失字段明确标为未记录；不会把缺失数据算成通过。
 
 ### 结果（2026-10-28）
 
