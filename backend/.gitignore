@@ -16,6 +16,7 @@ wheels/
 # data/chroma 是向量库的落盘文件，第一次启动后自动生成
 # uploads 是用户上传的文件，一般不必提交
 data/chroma/
+data/*.db
 uploads/
 
 # 评估集产物：SQLite 评估库、复制的向量库、运行结果都不进 git

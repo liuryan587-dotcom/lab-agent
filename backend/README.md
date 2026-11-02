@@ -38,7 +38,7 @@ Copy-Item .env.example .env
 
 ### 第 2 步：建数据库
 
-只需要建**空库**，表结构由程序启动时自动创建（`app/main.py` 里的 `Base.metadata.create_all`）。
+只需要建**空库**，表结构通过 Alembic 迁移创建：
 
 ```sql
 CREATE DATABASE lab_agent DEFAULT CHARACTER SET utf8mb4;
@@ -49,6 +49,14 @@ CREATE DATABASE lab_agent DEFAULT CHARACTER SET utf8mb4;
 ```powershell
 uv sync
 ```
+
+依赖安装完成后，为**新建空库**执行迁移（仍在 `backend/` 目录）：
+
+```powershell
+uv run alembic upgrade head
+```
+
+已有业务数据库请先阅读文末接入步骤，不要直接运行初始迁移。
 
 ### 第 4 步：拉 embedding 模型
 
@@ -182,12 +190,9 @@ app/common/response.py            包成 {code, message, data}
 
 按重要性排列，都是有意留着的现状：
 
-- **表结构靠 `create_all` 自动创建**，没有迁移工具（Alembic）。改字段需要手工处理：
-  `create_all` 只建缺失的表，不会给已有表加列（这次给 `pending_actions` 加
-  `thread_id` 就踩到了，只能 `DROP TABLE` 让它重建）
+- **新数据库通过 Alembic 迁移创建表结构**。已有数据库首次接入时需先核对 schema 并标记基线，不能直接执行初始迁移。
 - **预约冲突检查不是原子的**（先查再插），并发下可能重复预约
 - **对话历史按条数硬截断**（`MAX_HISTORY_MESSAGES = 40`），没有做摘要压缩，长对话会丢早期上下文
-- **`app/api/auth.py` 导入的 `IntegrityError` 来自 `pymysql`**，但 SQLAlchemy 抛出的是 `sqlalchemy.exc.IntegrityError`，两者不是同一个类，捕获不到
 - **前端没有自动化测试**，交互靠手工验证
 
 ---
@@ -205,3 +210,35 @@ app/common/response.py            包成 {code, message, data}
 评估集 runner 会自己检查这一点。
 
 评估集的设计、指标口径和历次结果见 [`tests/eval/README.md`](tests/eval/README.md)。
+
+## 已有数据库接入 Alembic
+
+项目早期版本在应用启动时用 `Base.metadata.create_all()` 建表。要把这种已有数据库纳入迁移管理：
+
+1. 先备份数据库。
+2. 确认现有表、列、外键和索引与 `migrations/versions/5ce161a3c16f_baseline_schema.py` 一致。预约冲突索引允许尚未创建，下一条迁移会补齐；如果已有同名索引，需确认列及顺序正确。其他差异需要先单独修复。`stamp` 只记录迁移版本，不会创建或修复表。
+3. 确认一致后，在 `backend/` 目录运行：
+
+   ```powershell
+   uv run alembic stamp 5ce161a3c16f
+   uv run alembic upgrade head
+   uv run alembic check
+   uv run alembic current
+   ```
+
+新建空数据库不要执行 `stamp`，直接 `uv run alembic upgrade head`。
+
+迁移连接地址来自 `.env` 或环境变量 `DATABASE_URL`，与应用配置一致；`alembic.ini` 不存数据库密码。当前没有对本地 MySQL 业务库自动执行迁移或 stamp。
+
+## 后续修改表结构
+
+修改 SQLAlchemy 模型后，在已升级到最新版本的开发数据库上执行：
+
+```powershell
+uv run alembic revision --autogenerate -m "describe schema change"
+# 审查生成的 upgrade / downgrade，再执行：
+uv run alembic upgrade head
+uv run alembic check
+```
+
+自动生成不保证识别字段重命名等语义，迁移脚本必须人工审查。将迁移文件与模型修改一起提交。`uv run alembic downgrade -1` 会执行上一版本的回退逻辑，可能删除字段或数据，只在备份后的可回退场景使用。

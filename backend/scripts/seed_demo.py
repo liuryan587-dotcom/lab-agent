@@ -29,6 +29,17 @@ def main() -> None:
 
     if args.reset and DB_PATH.exists():
         DB_PATH.unlink()
+    elif DB_PATH.exists():
+        import sqlite3
+
+        with sqlite3.connect(DB_PATH) as connection:
+            versioned = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'"
+            ).fetchone()
+        if not versioned:
+            print(f"Legacy demo database: {DB_PATH}")
+            print("Use --reset to recreate this disposable demo database with Alembic.")
+            return
 
     # Set these before importing app modules; Settings reads environment values
     # at import time. Dummy model values are enough for CRUD demos; AI chat still
@@ -39,13 +50,19 @@ def main() -> None:
     os.environ.setdefault("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
     os.environ.setdefault("LLM_MODEL", "qwen2.5:7b")
 
-    from app.database import Base, SessionLocal, engine
+    from app.database import SessionLocal
     from app.models.equipment import Equipment
     from app.models.lab import Lab
     from app.models.user import User
     from app.utils.password import hash_password
 
-    Base.metadata.create_all(bind=engine)
+    import subprocess
+
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=BACKEND_ROOT,
+        check=True,
+    )
     db = SessionLocal()
     try:
         if db.query(User).count() > 0:

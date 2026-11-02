@@ -4,7 +4,6 @@ import traceback
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.config import UPLOAD_DIR
-from app.database import Base, engine
 from app.api import api
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -21,10 +20,6 @@ from app.common.exceptions import (
     validation_exception_handler,
     global_exception_handler,
 )
-
-# 自动创建数据库和数据库表
-Base.metadata.create_all(bind=engine)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
