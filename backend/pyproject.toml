@@ -9,12 +9,18 @@ dependencies = [
     "chromadb==1.5.9",
     "cryptography==50.0.1",
     "fastapi==0.115.13",
+    # Agent 编排：代码里 import 了 langchain_openai / langgraph，
+    # 之前漏在 dependencies 外面，别人 clone 下来 uv sync 之后起不来
+    "langchain-core==1.6.6",
+    "langchain-openai==1.6.7",
+    "langgraph==1.2.12",
     "ollama>=0.6.3",
     "openai==3.14.1",
     "pydantic-settings==2.7.1",
     "pyjwt==2.13.0",
     "pymysql==1.1.1",
     "python-multipart>=0.0.32",
+    "pyyaml==6.0.3",
     "sqlalchemy==2.0.41",
     "uvicorn==0.34.0",
 ]

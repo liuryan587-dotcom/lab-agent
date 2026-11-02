@@ -3,7 +3,13 @@ from sqlalchemy import create_engine, DateTime
 from app.config import settings
 from datetime import datetime
 
-engine = create_engine(settings.DATABASE_URL)
+# 评估集跑在 SQLite 上，而 Agent 的工具是在线程池里执行的。
+# SQLite 默认禁止连接跨线程复用，这里对 SQLite 放开；MySQL 不受影响。
+_connect_args: dict = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    _connect_args["check_same_thread"] = False
+
+engine = create_engine(settings.DATABASE_URL, connect_args=_connect_args)
 
 # 数据库session会话的连接工厂
 SessionLocal = sessionmaker(bind=engine, autoflush=False)

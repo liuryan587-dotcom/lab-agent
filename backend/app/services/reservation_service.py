@@ -18,8 +18,14 @@ from app.database import SessionLocal
 logger = logging.getLogger(__name__)
 
 
-def create_reservation(db: Session, current_user: User, data: ReservationCreateRequest):
-    """创建预约记录"""
+def validate_reservation(db: Session, data: ReservationCreateRequest) -> dict:
+    """跑完所有业务校验，返回解析好的 date / time 字段。
+
+    抽出来是为了「待确认单」：
+      - 生成待确认记录时先跑一遍，避免让用户确认一个注定失败的预约
+      - 用户点确认时再跑一遍，防止两次之间数据变了（TOCTOU）
+    任何一条不满足都抛 BusinessException。
+    """
     now = datetime.now()
     current_date = now.date()  # date 对象，和 DATE 列同类型比较
     # 将当前时间也转换为 time 对象（截到分钟），和 TIME 列同类型比较
@@ -72,6 +78,7 @@ def create_reservation(db: Session, current_user: User, data: ReservationCreateR
         raise BusinessException(code=400, message="预约时间不能晚于实验室的关闭时间")
 
     # equipment_id 不为空 则表示这次是预约的实验室设备
+    equipment = None
     if data.equipment_id:
         equipment = (
             db.query(Equipment).filter(Equipment.id == data.equipment_id).first()
@@ -97,18 +104,29 @@ def create_reservation(db: Session, current_user: User, data: ReservationCreateR
     else:
         query = query.filter(Reservation.equipment_id.is_(None))
 
-    res = query.first()
-    if res:
+    if query.first():
         raise BusinessException(code=400, message="该时段已预约")
 
-    # 5. 保存记录（存 date / time 对象，和 DATE / TIME 列类型一致）
+    return {
+        "date": req_date,
+        "start_time": req_start_time,
+        "end_time": req_end_time,
+        "equipment": equipment,
+    }
+
+
+def create_reservation(db: Session, current_user: User, data: ReservationCreateRequest):
+    """创建预约记录（会完整跑一遍业务校验，确认接口也走这里）"""
+    parsed = validate_reservation(db, data)
+
+    # 保存记录（存 date / time 对象，和 DATE / TIME 列类型一致）
     reservation_model = Reservation(
         user_id=current_user.id,
         lab_id=data.lab_id,
         equipment_id=data.equipment_id,
-        date=req_date,
-        start_time=req_start_time,
-        end_time=req_end_time,
+        date=parsed["date"],
+        start_time=parsed["start_time"],
+        end_time=parsed["end_time"],
         remark=data.remark,
         status=0,
     )

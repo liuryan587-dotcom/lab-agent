@@ -1,0 +1,64 @@
+# 多轮记忆评估集
+#
+# 和 dataset.yaml 的区别：这里的每一轮都是**真实对话**，走 stream_agent +
+# thread_id，服务端保存完整消息（含工具调用结果）。
+# 目的：验证「上一轮查过的东西，这一轮不用再查」。
+
+- id: MT01
+  category: multi_turn_memory
+  turns:
+    - "人工智能实验室有哪些设备？"
+    - "显卡那台的规格是什么？"
+  expect:
+    # 第一轮查列表，第二轮应该直接用，不该再查
+    tools_per_turn_max: [2, 0]
+    answer_contains: ["RTX5090"]
+
+- id: MT02
+  category: multi_turn_memory
+  turns:
+    - "哪些实验室有显卡？"
+    - "那个实验室在几楼？"
+  expect:
+    tools_per_turn_max: [2, 0]
+    answer_contains: ["志明楼"]
+
+- id: MT03
+  category: multi_turn_memory
+  turns:
+    - "现在有哪些开放的实验室？"
+    - "这些实验室里容量最大的是哪个？"
+  expect:
+    # 答案在上一轮的列表里，不需要重新查
+    tools_per_turn_max: [2, 0]
+    answer_contains: ["计算机实验室"]
+
+- id: MT04
+  category: multi_turn_memory
+  turns:
+    - "帮我预约明天 14:00-16:00 的人工智能实验室。"
+    - "我刚才约的是几点到几点？"
+  expect:
+    # 第二轮问的是自己刚生成的待确认单，信息在同一轮的 tool 结果里
+    tools_per_turn_max: [4, 0]
+    answer_contains: ["14:00"]
+
+- id: MT05
+  category: multi_turn_memory
+  turns:
+    - "化学实验室周末开放吗？"
+    - "那物理实验室呢？"
+  expect:
+    # 对照组：第二轮需要的是新信息，允许（也应该）再查一次文档
+    tools_per_turn_max: [2, 2]
+    answer_contains: ["20:00"]
+
+- id: MT06
+  category: multi_turn_memory
+  turns:
+    - "人工智能实验室有哪些设备？"
+    - "帮我看一下预约规则是什么。"
+  expect:
+    # 话题切换：可以查文档，但不该把上一轮的设备再查一遍
+    tools_per_turn_max: [2, 2]
+    answer_contains: ["审核"]

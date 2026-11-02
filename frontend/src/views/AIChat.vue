@@ -2,8 +2,9 @@
   <div>
     <el-card>
       <template #header>
-        <div style="font-size: 16px; font-weight: bold">
-          <span>AI智能助手</span>
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <span style="font-size: 16px; font-weight: bold">AI智能助手</span>
+          <el-button size="small" @click="handleNewThread">新会话</el-button>
         </div>
       </template>
 
@@ -50,6 +51,46 @@
             >
               <div v-for="(step, i) in item.steps" :key="i">· {{ step }}</div>
             </div>
+
+            <!-- 待确认单：模型只生成了记录，点确认才真正落库 -->
+            <div v-if="item.pending" class="pending-card">
+              <div class="pending-head">待确认预约</div>
+              <div class="pending-line">
+                实验室：{{ item.pending.lab_name || 'ID ' + item.pending.lab_id }}
+                <template v-if="item.pending.equipment_name">
+                  · 设备：{{ item.pending.equipment_name }}
+                </template>
+              </div>
+              <div class="pending-line">
+                时间：{{ item.pending.date }} {{ item.pending.start_time }}–{{ item.pending.end_time }}
+              </div>
+              <div class="pending-line muted">确认后才会真正提交，5 分钟内有效</div>
+              <div v-if="item.pending.status === 0" class="pending-ops">
+                <el-button
+                  size="small"
+                  type="primary"
+                  :loading="item.pending.loading"
+                  @click="handleConfirm(item)"
+                >
+                  确认预约
+                </el-button>
+                <el-button
+                  size="small"
+                  :disabled="item.pending.loading"
+                  @click="handleCancel(item)"
+                >
+                  取消
+                </el-button>
+              </div>
+              <div
+                v-else
+                class="pending-result"
+                :class="item.pending.status === 1 ? 'ok' : 'muted'"
+              >
+                {{ item.pending.resultText }}
+              </div>
+            </div>
+
             <div class="md-body" v-html="parseMarkdown(item.content)"></div>
           </div>
         </div>
@@ -71,8 +112,14 @@
 </template>
 
 <script setup>
-import { chatStreamApi } from '@/api/ai'
-import { ref, reactive, nextTick } from 'vue'
+import {
+  chatStreamApi,
+  listPendingActions,
+  confirmPendingAction,
+  cancelPendingAction,
+  getChatHistory
+} from '@/api/ai'
+import { ref, reactive, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -81,6 +128,8 @@ const input = ref('') // 输入框内容
 const messages = ref([]) // 消息列表
 const loading = ref(false) // 发送中状态
 const listRef = ref(null) // 消息列表 DOM 引用
+const threadId = ref('') // 服务端分配的会话 id，续接上下文用
+const THREAD_KEY = 'lab-agent-thread-id' // 存 localStorage，刷新后能恢复
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -120,16 +169,19 @@ const handleSend = async () => {
   })
   messages.value.push(assistant)
 
-  const history = messages.value
-    .filter((item) => item.role === 'user' || item.role === 'assistant')
-    .slice(0, -1) // 去掉刚插入的空助手，避免把空 content 送回去
-    // 只保留 role/content；status、steps 丢掉
-    .map(({ role, content }) => ({ role, content }))
+  // 会话历史由服务端按 thread_id 保存（含工具调用结果）。
+  // 这里只发这一句，不要再把整段历史回传，否则会和服务端的历史重复。
+  const payload = { messages: [{ role: 'user', content: text }] }
+  if (threadId.value) payload.thread_id = threadId.value
 
   try {
     // 第二个参数是回调：每解析出一条 SSE 事件就进一次
-    await chatStreamApi({ messages: history }, (evt) => {
-      if (evt.type === 'status') {
+    await chatStreamApi(payload, (evt) => {
+      if (evt.type === 'thread') {
+        // 后端分配的会话 id，下一轮带回去才能续上上下文
+        threadId.value = evt.thread_id
+        localStorage.setItem(THREAD_KEY, evt.thread_id)
+      } else if (evt.type === 'status') {
         assistant.status = evt.message || '正在思考…'
       } else if (evt.type === 'tool_start') {
         const label = evt.label || evt.name || '工具'
@@ -139,6 +191,10 @@ const handleSend = async () => {
         const label = evt.label || evt.name || '工具'
         assistant.status = `${label}完成`
         assistant.steps.push(`完成：${label}`)
+      } else if (evt.type === 'pending_action') {
+        // 后端说「预约只是生成了待确认单」，这里渲染确认卡片
+        assistant.pending = { id: evt.action_id, status: 0, loading: false }
+        loadPendingDetail(assistant, evt.action_id)
       } else if (evt.type === 'token') {
         assistant.content += evt.content || '' // 打字机：追加，不是覆盖
         assistant.status = '' // 开始出字后清掉「正在…」，避免叠在一起
@@ -165,6 +221,110 @@ const handleSend = async () => {
     assistant.status = ''
     scrollToBottom()
   }
+}
+
+// ---------------------------------------------------------------- 待确认单
+// 卡片上要展示实验室名称，所以 SSE 只给 action_id，这里再拉一次详情
+const loadPendingDetail = async (assistant, actionId) => {
+  try {
+    const res = await listPendingActions()
+    const list = Array.isArray(res?.data) ? res.data : []
+    const found = list.find((item) => item.id === actionId)
+    if (found && assistant.pending) {
+      assistant.pending = { ...assistant.pending, ...found }
+    }
+  } catch {
+    // 拉不到详情也不影响确认，卡片会退化成只显示 id
+  }
+}
+
+const handleConfirm = async (message) => {
+  const pending = message.pending
+  if (!pending || pending.loading) return
+  pending.loading = true
+  try {
+    const res = await confirmPendingAction(pending.id)
+    pending.status = 1
+    pending.resultText = res?.data?.message || '预约已提交，请等待管理员审核'
+    // 界面上补一句「已提交」，让用户看到结果。
+    // 注意：真正给模型看的那条记录，是 confirm 接口写进服务端会话历史里的，
+    // 不是这里——这里只影响当前页面的显示。
+    const record = `\n\n> 已确认并提交：预约号 #${res?.data?.reservation_id}，${pending.resultText}`
+    if (!message.content.includes('已确认并提交')) {
+      message.content += record
+    }
+  } catch (err) {
+    // 业务校验失败（时段被抢、实验室关闭等）会走到这里
+    pending.status = 0
+    ElMessage.error(err?.message || '确认失败，请重新发起')
+  } finally {
+    pending.loading = false
+  }
+}
+
+const handleCancel = async (message) => {
+  const pending = message.pending
+  if (!pending || pending.loading) return
+  pending.loading = true
+  try {
+    await cancelPendingAction(pending.id)
+    pending.status = 2
+    pending.resultText = '已取消，不会提交预约'
+  } catch (err) {
+    ElMessage.error(err?.message || '取消失败')
+  } finally {
+    pending.loading = false
+  }
+}
+
+// ---------------------------------------------------------------- 会话恢复
+// threadId 存 localStorage。onMounted 时把消息和未确认的卡片拉回来。
+// localStorage 里的三种状态：
+//   null  —— 从没用过，退回到「最近一次会话」
+//   ''    —— 用户点过「新会话」，别再自动恢复
+//   其它  —— 具体会话 id
+onMounted(async () => {
+  const saved = localStorage.getItem(THREAD_KEY)
+  if (saved === '') return // 用户明确要新会话
+
+  try {
+    const res = await getChatHistory(saved || undefined)
+    const data = res?.data || {}
+    const restored = data.messages || []
+    const pendings = data.pending_actions || []
+
+    if (!data.thread_id || (!restored.length && !pendings.length)) {
+      localStorage.removeItem(THREAD_KEY)
+      return
+    }
+
+    threadId.value = data.thread_id
+    localStorage.setItem(THREAD_KEY, data.thread_id)
+    messages.value = restored.map((item) => ({
+      role: item.role,
+      content: item.content,
+      steps: []
+    }))
+    for (const action of pendings) {
+      messages.value.push({
+        role: 'assistant',
+        content: '',
+        steps: [],
+        pending: { ...action, loading: false }
+      })
+    }
+    scrollToBottom()
+  } catch (err) {
+    // 常见原因：后端没重启（404）、登录失效。保留 localStorage，修好后再刷新还能恢复
+    console.error('[AIChat] 恢复会话失败', err)
+  }
+})
+
+const handleNewThread = () => {
+  messages.value = []
+  threadId.value = ''
+  // 空字符串 = 用户主动开新会话，下次刷新不要再自动恢复旧对话
+  localStorage.setItem(THREAD_KEY, '')
 }
 </script>
 
@@ -260,5 +420,50 @@ const handleSend = async () => {
   border: none;
   border-top: 1px solid #ebeef5;
   margin: 10px 0;
+}
+
+/* 待确认卡片：模型只生成待确认记录，用户点确认才真正落库 */
+.pending-card {
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid #ffd591;
+  background: #fffbe6;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.pending-head {
+  font-weight: 600;
+  color: #ad6800;
+  margin-bottom: 6px;
+}
+
+.pending-line {
+  line-height: 1.7;
+  color: #333;
+}
+
+.pending-line.muted {
+  color: #909399;
+  font-size: 12px;
+}
+
+.pending-ops {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.pending-result {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.pending-result.ok {
+  color: #67c23a;
+}
+
+.pending-result.muted {
+  color: #909399;
 }
 </style>

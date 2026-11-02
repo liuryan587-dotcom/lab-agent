@@ -182,9 +182,26 @@ app/common/response.py            包成 {code, message, data}
 
 按重要性排列，都是有意留着的现状：
 
-- **没有自动化测试**，也没有 `pytest` 依赖
-- **两套 AI 对话实现并存**：`services/agent_service.py`（LangGraph，在用）和 `services/ai_service.py`（手写循环，早期版本）。后者有一个工具名对不上的 bug，且它的提示词说「不能提交预约」，与在用版本行为相反
-- **表结构靠 `create_all` 自动创建**，没有迁移工具（Alembic），改字段需要手工处理
+- **表结构靠 `create_all` 自动创建**，没有迁移工具（Alembic）。改字段需要手工处理：
+  `create_all` 只建缺失的表，不会给已有表加列（这次给 `pending_actions` 加
+  `thread_id` 就踩到了，只能 `DROP TABLE` 让它重建）
 - **预约冲突检查不是原子的**（先查再插），并发下可能重复预约
-- **AI 助手没有会话记忆**，多轮对话的上下文靠前端传纯文本，工具调用的中间状态会丢
+- **对话历史按条数硬截断**（`MAX_HISTORY_MESSAGES = 40`），没有做摘要压缩，长对话会丢早期上下文
 - **`app/api/auth.py` 导入的 `IntegrityError` 来自 `pymysql`**，但 SQLAlchemy 抛出的是 `sqlalchemy.exc.IntegrityError`，两者不是同一个类，捕获不到
+- **前端没有自动化测试**，交互靠手工验证
+
+---
+
+## 8. 测试
+
+| 命令（在 backend 目录下执行） | 覆盖什么 | 需要什么 |
+|---|---|---|
+| `.\.venv\Scripts\python.exe tests\test_pending_action.py` | 待确认单的安全边界：越权确认/取消、过期、重复确认 | 无（SQLite，秒级） |
+| `.\.venv\Scripts\python.exe tests\eval\runner.py --repeat 3` | 30 条 Agent 评估集，产出各项指标 | Ollama + 大模型配置 |
+| `.\.venv\Scripts\python.exe tests\eval\runner.py --multi-turn` | 6 条多轮记忆样本 | 同上 |
+
+**必须用项目 `.venv` 的解释器**，不要用系统/Anaconda 的 `python`——
+依赖只装在虚拟环境里，用错解释器会从别的 site-packages 导入，报莫名其妙的错。
+评估集 runner 会自己检查这一点。
+
+评估集的设计、指标口径和历次结果见 [`tests/eval/README.md`](tests/eval/README.md)。

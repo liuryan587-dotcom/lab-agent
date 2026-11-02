@@ -1,4 +1,38 @@
 import { getToken } from '@/utils/auth'
+import request from '@/utils/request'
+
+// ---------------------------------------------------------------- 待确认单
+// Agent 的写操作只生成待确认记录，必须用户点确认才落库
+
+export function listPendingActions() {
+  return request({ url: 'api/ai/pending-actions', method: 'get' })
+}
+
+export function confirmPendingAction(actionId) {
+  return request({
+    url: `api/ai/pending-actions/${actionId}/confirm`,
+    method: 'post'
+  })
+}
+
+export function cancelPendingAction(actionId) {
+  return request({
+    url: `api/ai/pending-actions/${actionId}/cancel`,
+    method: 'post'
+  })
+}
+
+/**
+ * 刷新页面后恢复对话：服务端按 thread_id 存的完整历史 + 还没确认的卡片。
+ * 不传 threadId 时，后端会退回到「当前用户最近一次会话」。
+ */
+export function getChatHistory(threadId) {
+  return request({
+    url: 'api/ai/history',
+    method: 'get',
+    params: threadId ? { thread_id: threadId } : {}
+  })
+}
 
 /**
  * SSE 流式对话。onEvent(evt) 每收到一条 data 回调一次。
