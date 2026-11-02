@@ -1,0 +1,30 @@
+# Local environment and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python and tooling caches
+**/__pycache__/
+*.py[cod]
+.venv/
+.uv-cache/
+**/.pytest_cache/
+
+# Runtime data and generated files
+backend/data/chroma/
+backend/logs/
+backend/uploads/
+backend/tests/eval/.cache/
+backend/tests/eval/results/*.json
+tmp/
+output/
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
