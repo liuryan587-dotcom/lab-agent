@@ -12,6 +12,7 @@
 
 # Runtime data and generated files
 backend/data/chroma/
+backend/data/demo.db
 backend/logs/
 backend/uploads/
 backend/tests/eval/.cache/

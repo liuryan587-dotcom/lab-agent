@@ -112,6 +112,25 @@ LLM_BASE_URL=https://your-provider.example.com/v1
 LLM_MODEL=your-model-name
 ```
 
+如果暂时只想体验登录、实验室、设备和预约等传统业务，可以使用项目提供的 SQLite 演示库，不需要先安装 MySQL：
+
+```powershell
+cd backend
+Copy-Item .env.example .env
+# 把 .env 中的 DATABASE_URL 改成：
+# DATABASE_URL=sqlite:///./data/demo.db
+\.venv\Scripts\python.exe scripts\seed_demo.py --reset
+```
+
+演示账号：
+
+| 账号 | 密码 | 角色 |
+| --- | --- | --- |
+| `demo_student` | `Demo123456!` | 学生 |
+| `demo_admin` | `Demo123456!` | 管理员 |
+
+SQLite 演示库只覆盖业务页面；AI 对话仍需要在 `.env` 中配置真实的 OpenAI 兼容模型，并启动 Ollama embedding 服务。
+
 先创建空数据库：
 
 ```sql
@@ -139,6 +158,7 @@ uv run uvicorn app.main:app --reload --port 8000
 
 ```powershell
 cd frontend
+Copy-Item .env.example .env.development
 npm install
 npm run dev
 ```
