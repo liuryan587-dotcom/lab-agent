@@ -1,7 +1,7 @@
 from datetime import date, time
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Date, ForeignKey, String, Time
+from sqlalchemy import Date, ForeignKey, Index, String, Time
 from app.models.lab import Lab
 from app.database import Base
 from app.models.user import User
@@ -10,7 +10,19 @@ from app.models.equipment import Equipment
 
 class Reservation(Base):
     __tablename__ = "reservations"
-    __table_args__ = {"comment": "预约信息"}
+    __table_args__ = (
+        # 加速冲突检查。真正的重叠判断仍由服务层完成，索引避免高并发下
+        # 每次预约都扫描同一实验室的全部历史记录。
+        Index(
+            "ix_reservations_conflict_lookup",
+            "lab_id",
+            "date",
+            "status",
+            "start_time",
+            "end_time",
+        ),
+        {"comment": "预约信息"},
+    )
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"), comment="预约人", nullable=False

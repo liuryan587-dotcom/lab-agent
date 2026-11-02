@@ -92,7 +92,7 @@ def validate_reservation(db: Session, data: ReservationCreateRequest) -> dict:
     # date / start_time / end_time 现在是 DATE / TIME 列，
     # 直接用 date / time 对象交给 MySQL 按真实时间语义判断重叠，不再拼字符串
     # 重叠条件：已有.start < 新.end 且 已有.end > 新.start
-    query = db.query(Reservation).filter(
+    query = db.query(Reservation).with_for_update().filter(
         Reservation.lab_id == data.lab_id,
         Reservation.date == req_date,
         Reservation.status.in_([0, 1]),  # 0待审核 1已通过

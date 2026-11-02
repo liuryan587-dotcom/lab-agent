@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends
-from pymysql import IntegrityError
 from app.schemas.auth import LoginRequest, RegisterRequest
 from sqlalchemy.orm import Session
 from app.database import get_db

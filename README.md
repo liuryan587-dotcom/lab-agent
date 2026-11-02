@@ -216,6 +216,16 @@ cd backend
 .\.venv\Scripts\python.exe tests\test_pending_action.py
 ```
 
+安装开发依赖后运行预约业务规则测试：
+
+```powershell
+cd backend
+uv sync --dev
+.\.venv\Scripts\python.exe -m pytest tests -q
+```
+
+这组测试覆盖待确认单的越权、过期、重复确认，以及预约时间范围、开放时间和时段冲突校验。
+
 ## 面试可以重点讲什么
 
 1. **为什么预约不能由模型直接写数据库？**
@@ -230,7 +240,7 @@ cd backend
 ## 当前限制与后续计划
 
 - 当前表结构由启动时 `create_all` 创建，尚未接入 Alembic 迁移。
-- 预约冲突检查仍需要进一步加强数据库层的并发约束。
+- 预约冲突检查已增加冲突查询索引和事务行锁；如果部署到高并发生产环境，仍建议进一步引入专门的时间段约束或预约写入队列。
 - 历史消息目前按数量截断，长对话还没有摘要压缩。
 - 前端自动化测试和确认接口的端到端评估仍可继续补充。
 - 当前本地启动依赖 MySQL、Ollama 和模型 API，后续可以增加 SQLite/Mock 模式降低体验门槛。

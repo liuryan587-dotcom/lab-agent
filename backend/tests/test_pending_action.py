@@ -29,9 +29,14 @@ sys.path.insert(0, str(BACKEND_ROOT))
 sys.path.insert(0, str(BACKEND_ROOT / "tests" / "eval"))
 
 # 必须在 import app.* 之前设置：config 在模块加载时就会读它
-DB_PATH = pathlib.Path(tempfile.gettempdir()) / "lab-agent-pending-test.db"
+DB_PATH = pathlib.Path(tempfile.gettempdir()) / f"lab-agent-pending-test-{os.getpid()}.db"
+# Use a process-specific SQLite file so pytest collection and the standalone
+# runner cannot fight over a database left open by another Python process.
 if DB_PATH.exists():
-    DB_PATH.unlink()
+    try:
+        DB_PATH.unlink()
+    except PermissionError:
+        DB_PATH = pathlib.Path(tempfile.gettempdir()) / f"lab-agent-pending-test-{os.getpid()}-retry.db"
 os.environ["DATABASE_URL"] = "sqlite:///" + DB_PATH.as_posix()
 
 import seed  # noqa: E402
@@ -53,6 +58,12 @@ TESTS = []
 def test(fn):
     TESTS.append(fn)
     return fn
+
+
+# This file has a small standalone runner and is also imported by pytest's
+# normal test discovery. Do not let the decorator helper itself be collected
+# as a test function requiring a fixture named ``fn``.
+test.__test__ = False
 
 
 # --------------------------------------------------------------------- helpers
