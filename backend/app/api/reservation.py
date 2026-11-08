@@ -25,6 +25,30 @@ def get_reservation_page_list(
     return Response.success(data=res)
 
 
+@router.get("/starts")
+def get_reservation_starts(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    open_start: int = 480,
+    open_end: int = 1260,
+    slot_duration: int = 60,
+    min_gap: int = 10,
+    buffer: int = 10,
+):
+    EXISTING = [
+        (600, 660),
+        (720, 780),
+        (840, 900),
+        (960, 1020),
+        (1080, 1140),
+        (1200, 1260),
+    ]
+    res = reservation_service.find_free_slots(
+        EXISTING, open_start, open_end, slot_duration, min_gap, buffer
+    )
+    return Response.success(data=res)
+
+
 @router.put("/{reservation_id}/cancel")
 def cancel_reservation(
     reservation_id: int,

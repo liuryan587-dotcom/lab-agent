@@ -48,5 +48,14 @@ class ReservationResponse(BaseModel):
         return value
 
 
+class ReservationStartsRequest(BaseModel):
+    exsit: list[tuple[int, int]] = []
+    open_start: int = 480
+    open_end: int = 1260
+    slot_duration: int = 60
+    min_gap: int = 10
+    buffer: int = 10
+
+
 class AuditReservationRequest(BaseModel):
     status: int  #  1 | 2

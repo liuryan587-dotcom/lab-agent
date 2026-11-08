@@ -92,12 +92,16 @@ def validate_reservation(db: Session, data: ReservationCreateRequest) -> dict:
     # date / start_time / end_time 现在是 DATE / TIME 列，
     # 直接用 date / time 对象交给 MySQL 按真实时间语义判断重叠，不再拼字符串
     # 重叠条件：已有.start < 新.end 且 已有.end > 新.start
-    query = db.query(Reservation).with_for_update().filter(
-        Reservation.lab_id == data.lab_id,
-        Reservation.date == req_date,
-        Reservation.status.in_([0, 1]),  # 0待审核 1已通过
-        Reservation.start_time < req_end_time,
-        Reservation.end_time > req_start_time,
+    query = (
+        db.query(Reservation)
+        .with_for_update()
+        .filter(
+            Reservation.lab_id == data.lab_id,
+            Reservation.date == req_date,
+            Reservation.status.in_([0, 1]),  # 0待审核 1已通过
+            Reservation.start_time < req_end_time,
+            Reservation.end_time > req_start_time,
+        )
     )
     if data.equipment_id:
         query = query.filter(Reservation.equipment_id == data.equipment_id)
@@ -142,6 +146,72 @@ def create_reservation(db: Session, current_user: User, data: ReservationCreateR
         db.rollback()
         logger.exception("创建预约失败")
         raise BusinessException(code=400, message="预约失败,请稍后再试")
+
+
+def has_conflict(
+    existing: list[tuple[int, int]], start: int, end: int, buffer: int = 0
+) -> bool:
+    """existing 每个元素是 (开始分钟, 结束分钟)，表示当天已有的预约。
+    返回 True 表示 [start, end) 与其中至少一个区间重叠。
+    """
+    if start >= end:
+        raise BusinessException(code=400, message=f"start={start} 必须小于 end={end}")
+    if buffer < 0:
+        raise BusinessException(code=400, message=f"buffer={buffer} 必须大于等于 0")
+    for e_start, e_end in existing:
+        if start - buffer < e_end and end + buffer > e_start:
+            return True
+    return False
+
+
+def time_map(slots: list, minte: int = 60) -> list:
+    """将 slots 中的数字映射成时间
+    例如:0->00:00, 60->01:00, 120->02:00
+    """
+    result = []
+    for slot in slots:
+        hour, minute = divmod(slot, minte)
+        result.append(f"{hour:02d}:{minute:02d}")
+    print(result)
+    return result
+
+
+def find_free_slots(
+    existing: list[tuple[int, int]],
+    open_start: int,
+    open_end: int,
+    duration: int,
+    step: int = 10,
+    buffer: int = 0,
+) -> dict[str, list]:
+    """返回当天所有可以开始的时刻（分钟）。
+
+    规则：
+    - 只在 [open_start, open_end) 范围内找候选时刻，按 step 递增枚举
+    - 每个返回的 t 必须满足：整段 [t, t + duration) 都落在开放区间内
+    - [t, t + duration) 与 existing 中任何区间冲突则跳过
+    - duration <= 0、step <= 0、open_start >= open_end 时直接 raise ValueError
+    """
+    if duration <= 0:
+        raise BusinessException(code=400, message=f"duration={duration} 必须大于 0")
+    if step <= 0:
+        raise BusinessException(code=400, message=f"step={step} 必须大于 0")
+    if open_start >= open_end:
+        raise BusinessException(
+            code=400,
+            message=f"open_start={open_start} 必须小于 open_end={open_end}",
+        )
+    if buffer < 0:
+        raise BusinessException(code=400, message=f"buffer={buffer} 必须大于等于 0")
+    slot_start = open_start
+    start_times = []
+    while slot_start + duration <= open_end:
+        if not has_conflict(existing, slot_start, slot_start + duration, buffer):
+            start_times.append(slot_start)
+        slot_start += step
+    start_times_hm = time_map(start_times)
+    result = {"slots": start_times, "labels": start_times_hm}
+    return result
 
 
 def get_reservation_page_list(

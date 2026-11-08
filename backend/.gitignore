@@ -22,3 +22,7 @@ uploads/
 # 评估集产物：SQLite 评估库、复制的向量库、运行结果都不进 git
 tests/eval/.cache/
 tests/eval/results/*.json
+
+# 学习笔记：本地生成的 md 文件不进 git
+docs/
+八股学习/
