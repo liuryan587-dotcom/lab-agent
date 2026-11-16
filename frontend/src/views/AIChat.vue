@@ -233,8 +233,10 @@ const loadPendingDetail = async (assistant, actionId) => {
     if (found && assistant.pending) {
       assistant.pending = { ...assistant.pending, ...found }
     }
-  } catch {
-    // 拉不到详情也不影响确认，卡片会退化成只显示 id
+  } catch (err) {
+    // 以前这里是空 catch：接口 404 / 超时 / 返回 HTML 都看不见，
+    // 卡片就静默退化成「实验室：ID undefined、时间：–」。排查时先看这条日志。
+    console.warn('[AIChat] 待确认单详情加载失败', err)
   }
 }
 

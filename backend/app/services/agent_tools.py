@@ -80,7 +80,10 @@ def _resolve_lab_id(db, raw: str | int) -> tuple[int | None, str | None]:
     if labs:
         options = "、".join(f"{lab.id}={lab.name}" for lab in labs)
         return None, f"「{text}」匹配到多个实验室（{options}），请改用其中一个的数字 id"
-    return None, f"没有找到名称包含「{text}」的实验室，请先调用 list_open_labs 查看可选项"
+    return (
+        None,
+        f"没有找到名称包含「{text}」的实验室，请先调用 list_open_labs 查看可选项",
+    )
 
 
 def build_tools(current_user: User, thread_id: str | None = None):
@@ -95,7 +98,10 @@ def build_tools(current_user: User, thread_id: str | None = None):
             return kb_service.search(query) or "没有检索到相关的资料"
         except Exception as exc:
             logger.exception("search_lab_docs 失败")
-            return _err(str(exc), hint="知识库检索失败，请直接告诉用户暂时查不到文档，不要重复调用")
+            return _err(
+                str(exc),
+                hint="知识库检索失败，请直接告诉用户暂时查不到文档，不要重复调用",
+            )
 
     @tool
     def list_open_labs(keywords: str = "") -> str:
@@ -121,7 +127,9 @@ def build_tools(current_user: User, thread_id: str | None = None):
             return json.dumps({"total": total, "labs": rows}, ensure_ascii=False)
         except Exception as exc:
             logger.exception("list_open_labs 失败")
-            return _err(str(exc), hint="实验室列表查询失败，请告诉用户稍后再试，不要重复调用")
+            return _err(
+                str(exc), hint="实验室列表查询失败，请告诉用户稍后再试，不要重复调用"
+            )
 
     @tool
     def list_lab_equipments(lab_id: str | int, keywords: str = "") -> str:

@@ -1,6 +1,7 @@
 import logging
 import traceback
 
+from requests import session
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.common.exceptions import BusinessException
@@ -164,16 +165,40 @@ def has_conflict(
     return False
 
 
-def time_map(slots: list, minte: int = 60) -> list:
+def time_map(slots: list) -> list:
     """将 slots 中的数字映射成时间
     例如:0->00:00, 60->01:00, 120->02:00
     """
     result = []
     for slot in slots:
-        hour, minute = divmod(slot, minte)
+        hour, minute = divmod(slot, 60)
         result.append(f"{hour:02d}:{minute:02d}")
-    print(result)
     return result
+
+
+def to_minutes(hhmm: str) -> int:
+    """将时间字符串转换为分钟数"""
+    hour, minute = map(int, hhmm.split(":"))
+    return hour * 60 + minute
+
+
+def max_overlap(existing: list[tuple[int, int]], start: int, end: int) -> int:
+    """[start, end) 区间内，同一时刻最多有几条已有预约重叠。"""
+    overlap_list: list[tuple[int, int]] = []
+    for e_start, e_end in existing:
+        if has_conflict([(e_start, e_end)], start, end):
+            overlap_list.append((e_start, e_end))
+
+    events = []
+    for s_statr, e_end in overlap_list:
+        events.append((s_statr, 1))  # 预约开始，重叠数 +1
+        events.append((e_end, -1))  # 预约结束，重叠数 -1
+    events.sort(key=lambda x: (x[0], x[1]))  # 按时间排序，开始事件在结束事件之前
+    cur = best = 0
+    for _, delta in events:
+        cur += delta
+        best = max(best, cur)
+    return best
 
 
 def find_free_slots(
@@ -183,6 +208,8 @@ def find_free_slots(
     duration: int,
     step: int = 10,
     buffer: int = 0,
+    capacity: int = 1,
+    earliest: int = 0,
 ) -> dict[str, list]:
     """返回当天所有可以开始的时刻（分钟）。
 
@@ -206,7 +233,12 @@ def find_free_slots(
     slot_start = open_start
     start_times = []
     while slot_start + duration <= open_end:
-        if not has_conflict(existing, slot_start, slot_start + duration, buffer):
+        if slot_start < earliest:
+            slot_start += step
+            continue
+        window_start = slot_start - buffer
+        window_end = slot_start + duration + buffer
+        if max_overlap(existing, window_start, window_end) + 1 <= capacity:
             start_times.append(slot_start)
         slot_start += step
     start_times_hm = time_map(start_times)

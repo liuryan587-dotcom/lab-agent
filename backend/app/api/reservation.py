@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-
+from datetime import date
 from app.common.response import Response
 from app.database import get_db
 from app.dependencies.auth import get_current_user, get_current_admin
+from app.models.reservation import Reservation
 from app.models.user import User
+from app.models.lab import Lab
 from app.schemas.reservation import ReservationCreateRequest, AuditReservationRequest
 from app.services import reservation_service
+from datetime import datetime
 
 router = APIRouter(prefix="/reservation", tags=["预约相关接口"])
 
@@ -27,25 +30,50 @@ def get_reservation_page_list(
 
 @router.get("/starts")
 def get_reservation_starts(
-    current_user: User = Depends(get_current_user),
+    lab_id: int,
+    day: date,
     db: Session = Depends(get_db),
-    open_start: int = 480,
-    open_end: int = 1260,
+    current_user: User = Depends(get_current_user),
     slot_duration: int = 60,
-    min_gap: int = 10,
-    buffer: int = 10,
+    step: int = 10,
+    buffer: int = 0,
 ):
-    EXISTING = [
-        (600, 660),
-        (720, 780),
-        (840, 900),
-        (960, 1020),
-        (1080, 1140),
-        (1200, 1260),
-    ]
-    res = reservation_service.find_free_slots(
-        EXISTING, open_start, open_end, slot_duration, min_gap, buffer
+    rows = (
+        db.query(Reservation)
+        .filter(
+            Reservation.lab_id == lab_id,
+            Reservation.date == day,
+            Reservation.status != 2,
+            Reservation.status != 3,
+        )
+        .all()
     )
+    EXISTING = [
+        (
+            row.start_time.hour * 60 + row.start_time.minute,
+            row.end_time.hour * 60 + row.end_time.minute,
+        )
+        for row in rows
+    ]
+    lab = db.query(Lab).filter(Lab.id == lab_id).first()
+    capacity = lab.capacity
+    open_start = reservation_service.to_minutes(lab.open_time)
+    open_end = reservation_service.to_minutes(lab.close_time)
+    earliest = open_start
+    if day == date.today():
+        now = datetime.now()
+        earliest = now.hour * 60 + now.minute
+    res = reservation_service.find_free_slots(
+        existing=EXISTING,
+        open_start=open_start,
+        open_end=open_end,
+        duration=slot_duration,
+        step=step,
+        buffer=buffer,
+        capacity=capacity,
+        earliest=earliest,
+    )
+
     return Response.success(data=res)
 
 

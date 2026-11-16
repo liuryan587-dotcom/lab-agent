@@ -47,6 +47,20 @@ Agent 调用 create_lab_reservation
 写入 reservations，等待管理员审核
 ```
 
+## 界面预览
+
+**系统首页**：登录后展示开放实验室数量、与我相关的预约数和 AI 助手状态，并提供快捷入口。
+
+<img src="assets/screenshots/home.png" alt="系统首页" width="880">
+
+**AI 助手查设备**：用自然语言提问，Agent 调用 `search_equipments` 跨实验室检索，把结果整理成表格，并追问「设备 + 日期 + 时段」。
+
+<img src="assets/screenshots/ai-chat-equipment-search.png" alt="AI 助手查询显卡" width="880">
+
+**生成待确认预约**：参数齐全后 Agent 调用 `create_lab_reservation`，只生成一张 5 分钟内有效的待确认卡片；点击「确认预约」后服务端重新校验并落库，会话里会补一条「已确认并提交：预约号 #199」。
+
+<img src="assets/screenshots/ai-chat-pending-action.png" alt="AI 助手生成待确认预约" width="880">
+
 ## 技术栈
 
 | 层次 | 技术 |
@@ -79,6 +93,7 @@ lab-agent/
 │   ├── src/views/            登录、预约、管理和 AI 对话页面
 │   ├── src/api/              后端 API 封装
 │   └── package.json
+├── assets/screenshots/       README 用的界面截图
 ├── docs/                     架构、评估和学习记录
 └── README.md
 ```

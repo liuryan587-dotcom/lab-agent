@@ -3,21 +3,26 @@ import request from '@/utils/request'
 
 // ---------------------------------------------------------------- 待确认单
 // Agent 的写操作只生成待确认记录，必须用户点确认才落库
+//
+// 注意 url 必须以 "/" 开头：AI 页面在 /manager/ai-chat（两段路径），
+// 相对地址会被浏览器按「当前目录」拼成 /manager/api/...，Vite 只代理 /api，
+// 于是拿到的是 index.html（200 text/html），axios 拦截器判为失败。
+// 本项目其它 api 文件（lab/user/reservation...）都写了前导 "/"，只有这里漏了。
 
 export function listPendingActions() {
-  return request({ url: 'api/ai/pending-actions', method: 'get' })
+  return request({ url: '/api/ai/pending-actions', method: 'get' })
 }
 
 export function confirmPendingAction(actionId) {
   return request({
-    url: `api/ai/pending-actions/${actionId}/confirm`,
+    url: `/api/ai/pending-actions/${actionId}/confirm`,
     method: 'post'
   })
 }
 
 export function cancelPendingAction(actionId) {
   return request({
-    url: `api/ai/pending-actions/${actionId}/cancel`,
+    url: `/api/ai/pending-actions/${actionId}/cancel`,
     method: 'post'
   })
 }
@@ -28,7 +33,7 @@ export function cancelPendingAction(actionId) {
  */
 export function getChatHistory(threadId) {
   return request({
-    url: 'api/ai/history',
+    url: '/api/ai/history',
     method: 'get',
     params: threadId ? { thread_id: threadId } : {}
   })
