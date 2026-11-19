@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str
     LLM_MODEL: str
 
+    # 知识库 embedding。默认连本机 Ollama；
+    # 跑在容器里时用 OLLAMA_BASE_URL=http://host.docker.internal:11434 指回宿主机
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    EMBEDDING_MODEL: str = "qwen3-embedding:8b"
+
     LOG_LEVEL: str = "INFO"
 
     model_config = SettingsConfigDict(

@@ -1,0 +1,58 @@
+# 一键起：MySQL + 后端 + 前端
+# 用法：
+#   cp .env.example .env      然后填 LLM_API_KEY
+#   docker compose up -d --build
+#   浏览器打开 http://localhost:8080
+#
+# Ollama 不放进 compose：模型体积大、容器重启会丢，
+# 让它跑在宿主机上，后端通过 host.docker.internal 连过去。
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: lab_agent
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # 后端要等 MySQL 真的能接受连接，depends_on 只看容器启动是不够的
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root123}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-root123}@mysql:3306/lab_agent?charset=utf8mb4
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-please-change-me}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      LLM_MODEL: ${LLM_MODEL}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:8b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/app/data/chroma
+      - uploads_data:/app/uploads
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  mysql_data:
+  chroma_data:
+  uploads_data:

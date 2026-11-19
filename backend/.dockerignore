@@ -1,0 +1,13 @@
+# 进镜像的东西越少越好：虚拟环境、缓存、本地数据和密钥都不该进去
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+data/chroma
+uploads
+logs
+.env
+.git
+tests/eval/.cache
+tests/eval/results

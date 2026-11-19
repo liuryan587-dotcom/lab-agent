@@ -1,7 +1,7 @@
 from chromadb.api.models.Collection import Collection
 import chromadb
 
-from app.config import BASE_DIR
+from app.config import BASE_DIR, settings
 
 KB_DIR = BASE_DIR / "data" / "kb"
 CHROMA_DIR = BASE_DIR / "data" / "chroma"
@@ -19,7 +19,7 @@ def get_embedding_fn():
     if _embedding_fn is not None:
         return _embedding_fn
     _embedding_fn = OllamaEmbeddingFunction(
-        url="http://localhost:11434", model_name="qwen3-embedding:8b"
+        url=settings.OLLAMA_BASE_URL, model_name=settings.EMBEDDING_MODEL
     )
     return _embedding_fn
 
