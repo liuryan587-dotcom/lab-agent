@@ -202,7 +202,7 @@ app/common/response.py            包成 {code, message, data}
 | 命令（在 backend 目录下执行） | 覆盖什么 | 需要什么 |
 |---|---|---|
 | `.\.venv\Scripts\python.exe tests\test_pending_action.py` | 待确认单的安全边界：越权确认/取消、过期、重复确认 | 无（SQLite，秒级） |
-| `.\.venv\Scripts\python.exe tests\eval\runner.py --repeat 3` | 30 条 Agent 评估集，产出各项指标 | Ollama + 大模型配置 |
+| `.\.venv\Scripts\python.exe tests\eval\runner.py --repeat 3` | 32 条 Agent 评估集，产出各项指标 | Ollama + 大模型配置 |
 | `.\.venv\Scripts\python.exe tests\eval\runner.py --multi-turn` | 6 条多轮记忆样本 | 同上 |
 
 **必须用项目 `.venv` 的解释器**，不要用系统/Anaconda 的 `python`——

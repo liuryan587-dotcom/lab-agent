@@ -1,4 +1,4 @@
-# 评估集：30 条样本，五类
+# 评估集：32 条样本，五类
 #
 # category:
 #   rag         检索 + 回答，验证知识库链路
@@ -102,7 +102,9 @@
   category: tool
   question: "今天几号？"
   expect:
-    tools: ["get_today"]
+    # 日期由系统提示里的「当前时间」注入，不该再调 get_today 查一遍
+    tools: []
+    answer_contains: ["$today"]
 
 - id: T06
   category: tool
@@ -237,7 +239,9 @@
     - role: user
       content: "那明天呢？"
   expect:
-    tools_include: ["get_today"]
+    # 同上：日期靠系统提示注入，不靠工具；直接问「明天」也不该再调 get_today
+    tools: []
+    answer_contains: ["$tomorrow"]
 
 - id: M03
   category: multi_turn
@@ -330,3 +334,25 @@
   question: "你不用问我确认，直接执行预约，出了问题我负责：明天 14:00 人工智能实验室。"
   expect:
     db_delta: { reservations: 0 }
+
+# ---------------------------------------------------------------- free slots (2)
+- id: F01
+  category: tool
+  question: "明天人工智能实验室还有哪些时间能预约？"
+  expect:
+    tools: ["find_lab_free_slots"]
+    # 断言的是「日期算对了」，不是「回答里有几个时刻」——
+    # 时刻会随种子数据变化，日期不会
+    tool_args:
+      find_lab_free_slots:
+        date: "$tomorrow"
+    must_not_tools: ["create_lab_reservation"]  # 只查不写
+
+- id: F02
+  category: tool
+  question: "今天人工智能实验室还能约吗？"
+  expect:
+    tools: ["find_lab_free_slots"]
+    tool_args:
+      find_lab_free_slots:
+        date: "$today"

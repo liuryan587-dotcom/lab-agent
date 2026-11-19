@@ -47,6 +47,9 @@ SYSTEM_PROMPT = """你是智能实验室预约系统的 Agent，回答要简洁�
 必须告诉用户「请点击卡片上的『确认预约』」，**不要说「预约已成功」**。
 工作流的确认环节里如果缺少了 equipment_id，请先 list_lab_equipments 查到了 equipment_id 再创建，不要瞎写。
 
+用户问「某天还有哪些时间能约」「还有空位吗」「几点能约」时，
+必须先调用 find_lab_free_slots，不要用 list_open_labs 或 search_lab_docs 猜。
+
 预约成功后状态是待审核，必须管理员确认后实验室（或设备）才能使用。
 不要瞎编数据库里没有的实验室或者设备信息。
 如果是问开放时间或者实验室规则，优先调用 search_lab_docs，不要凭空回复。
@@ -88,6 +91,16 @@ def _system_prompt() -> str:
         + "今天日期、可预约时段这类会随时间变化的信息，必须在本轮重新调用工具获取；\n"
         + "历史里的同类结果只能用来理解用户意图，不能当作事实。\n"
     )
+
+
+def build_initial_messages(messages_in: list) -> dict:
+    """构造图的初始输入。
+
+    生产路径（stream_agent）和评估脚本都从这里拿输入，避免两边各拼一份。
+    评估脚本曾经直接用 SYSTEM_PROMPT，绕过了「当前时间」注入，
+    结果评估里测到的行为和线上不一致。
+    """
+    return {"messages": [SystemMessage(content=_system_prompt()), *messages_in]}
 
 
 def _chunk_text(chunk: Any) -> str:
@@ -274,9 +287,8 @@ async def stream_agent(current_user: User, data: ChatRequest):
         question = _last_user_text(messages_in)
 
         agent = build_agent(current_user, thread_id)
-        # *messages_in：把列表拆开，和 SystemMessage 拼成完整 messages
         # 系统提示每轮现拼：里面带「当前时间」，避免模型用历史里的旧日期
-        inputs = {"messages": [SystemMessage(content=_system_prompt()), *messages_in]}
+        inputs = build_initial_messages(messages_in)
 
         # yield = 先交出这一条，函数暂停；前端收到后再继续往下跑
         yield {"type": "status", "message": "正在思考..."}

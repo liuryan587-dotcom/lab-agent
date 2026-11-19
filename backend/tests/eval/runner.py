@@ -21,6 +21,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -222,6 +223,23 @@ def resolve_expected(value):
     return target.isoformat() if target else value
 
 
+_CN_DATE = re.compile(r"(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日")
+_SLASH_DATE = re.compile(r"(\d{4})\s*/\s*(\d{1,2})\s*/\s*(\d{1,2})")
+
+
+def normalize_answer(text: str) -> str:
+    """把「2026年11月19日」「2026/11/19」统一成「2026-11-19」。
+
+    模型回答日期时习惯用中文写法，而 $today 断言比的是 ISO 串。
+    不归一化的话，样本会因为「写法不同」而红，看起来像模型答错了。
+    """
+
+    def _to_iso(m):
+        return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+
+    return _SLASH_DATE.sub(_to_iso, _CN_DATE.sub(_to_iso, text))
+
+
 def norm_arg(key, value):
     """统一参数形态再比较：id 一律按字符串、时间去掉秒。"""
     text = "" if value is None else str(value).strip()
@@ -308,8 +326,20 @@ def evaluate(case, run, delta) -> tuple[dict, list]:
             fails.append(f"检索未命中文档 {needle}")
 
     if "answer_contains" in exp or "answer_not_contains" in exp:
-        missing = [k for k in exp.get("answer_contains", []) if k not in run["answer"]]
-        banned = [k for k in exp.get("answer_not_contains", []) if k in run["answer"]]
+        # 和 tool_args 保持一致：$today / $tomorrow 要换成真实日期再比，
+        # 否则样本只能写死某一天，第二天必然失效。
+        # 回答先归一化：中文日期写法不该导致样本误红。
+        answer = normalize_answer(run["answer"])
+        missing = [
+            k
+            for k in exp.get("answer_contains", [])
+            if resolve_expected(k) not in answer
+        ]
+        banned = [
+            k
+            for k in exp.get("answer_not_contains", [])
+            if resolve_expected(k) in answer
+        ]
         checks["answer"] = not missing and not banned
         if missing:
             fails.append(f"回答缺少关键词: {missing}")
@@ -331,8 +361,6 @@ def evaluate(case, run, delta) -> tuple[dict, list]:
 
 # --------------------------------------------------------------------- 执行
 async def run_case(case, args, student_username):
-    from langchain_core.messages import SystemMessage
-
     from app.database import SessionLocal
     from app.models.pending_action import PendingAction
     from app.models.reservation import Reservation
@@ -359,13 +387,9 @@ async def run_case(case, args, student_username):
         {"role": "user", "content": case.get("question", "")}
     ]
     request = ChatRequest(messages=[ChatMessage(**item) for item in history])
-    # 复用生产代码里的 history 构造逻辑，保证评估和线上行为一致
-    inputs = {
-        "messages": [
-            SystemMessage(content=agent_service.SYSTEM_PROMPT),
-            *agent_service._build_history(request),
-        ]
-    }
+    # 复用生产代码的输入构造（内含「当前时间」注入），保证评估和线上行为一致。
+    # 以前这里自己拼 SystemMessage，绕过了注入，测出来的行为和线上不一样。
+    inputs = agent_service.build_initial_messages(agent_service._build_history(request))
 
     agent = agent_service.build_agent(user)
 
