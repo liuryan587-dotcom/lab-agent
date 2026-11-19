@@ -11,6 +11,7 @@ services:
   mysql:
     image: mysql:8.4
     environment:
+      TZ: Asia/Shanghai
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
       MYSQL_DATABASE: lab_agent
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
@@ -27,6 +28,8 @@ services:
   backend:
     build: ./backend
     environment:
+      # 时区必须显式设置：容器默认 UTC，会让「今天几号 / 现在能不能约」偏 8 小时
+      TZ: Asia/Shanghai
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-root123}@mysql:3306/lab_agent?charset=utf8mb4
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-please-change-me}
       LLM_API_KEY: ${LLM_API_KEY}
