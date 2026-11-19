@@ -29,15 +29,11 @@ sys.path.insert(0, str(BACKEND_ROOT))
 sys.path.insert(0, str(BACKEND_ROOT / "tests" / "eval"))
 
 # 必须在 import app.* 之前设置：config 在模块加载时就会读它
-DB_PATH = pathlib.Path(tempfile.gettempdir()) / f"lab-agent-pending-test-{os.getpid()}.db"
+DB_PATH = (
+    pathlib.Path(tempfile.gettempdir()) / f"lab-agent-pending-test-{os.getpid()}.db"
+)
 # Use a process-specific SQLite file so pytest collection and the standalone
 # runner cannot fight over a database left open by another Python process.
-if DB_PATH.exists():
-    try:
-        DB_PATH.unlink()
-    except PermissionError:
-        DB_PATH = pathlib.Path(tempfile.gettempdir()) / f"lab-agent-pending-test-{os.getpid()}-retry.db"
-os.environ["DATABASE_URL"] = "sqlite:///" + DB_PATH.as_posix()
 
 import seed  # noqa: E402
 from app.common.exceptions import BusinessException  # noqa: E402
@@ -114,8 +110,12 @@ def test_confirm_happy_path():
         reservation = pending_action_service.confirm(db, student.id, action.id)
         db.refresh(action)
 
-        assert action.status == STATUS_EXECUTED, f"状态应变为已执行，实际 {action.status}"
-        assert action.executed_reservation_id == reservation.id, "没把预约 id 回填到待确认单"
+        assert (
+            action.status == STATUS_EXECUTED
+        ), f"状态应变为已执行，实际 {action.status}"
+        assert (
+            action.executed_reservation_id == reservation.id
+        ), "没把预约 id 回填到待确认单"
         assert db.query(Reservation).count() == before + 1, "确认后预约表没增加"
     finally:
         db.close()
@@ -129,7 +129,9 @@ def test_cannot_confirm_others_action():
         action = make_pending(db, student)
         before = db.query(Reservation).count()
 
-        expect_error(403, lambda: pending_action_service.confirm(db, admin.id, action.id))
+        expect_error(
+            403, lambda: pending_action_service.confirm(db, admin.id, action.id)
+        )
 
         db.refresh(action)
         assert action.status == STATUS_PENDING, "被拒绝后状态不该变"
@@ -144,7 +146,9 @@ def test_cannot_cancel_others_action():
     try:
         action = make_pending(db, student)
 
-        expect_error(403, lambda: pending_action_service.cancel(db, admin.id, action.id))
+        expect_error(
+            403, lambda: pending_action_service.cancel(db, admin.id, action.id)
+        )
 
         db.refresh(action)
         assert action.status == STATUS_PENDING, "被别人取消掉了"
@@ -161,10 +165,14 @@ def test_expired_action_cannot_be_confirmed():
         db.commit()
 
         before = db.query(Reservation).count()
-        expect_error(400, lambda: pending_action_service.confirm(db, student.id, action.id))
+        expect_error(
+            400, lambda: pending_action_service.confirm(db, student.id, action.id)
+        )
 
         db.refresh(action)
-        assert action.status == STATUS_EXPIRED, f"过期单状态应变为 3，实际 {action.status}"
+        assert (
+            action.status == STATUS_EXPIRED
+        ), f"过期单状态应变为 3，实际 {action.status}"
         assert db.query(Reservation).count() == before, "过期单竟然写进了预约"
     finally:
         db.close()
@@ -180,7 +188,9 @@ def test_cancelled_action_cannot_be_confirmed():
         assert action.status == STATUS_CANCELLED, "取消后状态应为 2"
 
         before = db.query(Reservation).count()
-        expect_error(400, lambda: pending_action_service.confirm(db, student.id, action.id))
+        expect_error(
+            400, lambda: pending_action_service.confirm(db, student.id, action.id)
+        )
         assert db.query(Reservation).count() == before, "已取消的单子还能确认"
     finally:
         db.close()
@@ -194,7 +204,9 @@ def test_double_confirm_writes_once():
         before = db.query(Reservation).count()
 
         pending_action_service.confirm(db, student.id, action.id)
-        expect_error(400, lambda: pending_action_service.confirm(db, student.id, action.id))
+        expect_error(
+            400, lambda: pending_action_service.confirm(db, student.id, action.id)
+        )
 
         assert db.query(Reservation).count() == before + 1, "重复确认写了多条预约"
     finally:

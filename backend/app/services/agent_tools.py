@@ -254,10 +254,70 @@ def build_tools(current_user: User, thread_id: str | None = None):
             return _err(str(exc), hint="设备搜索失败，请告诉用户稍后再试")
 
     @tool
-    def get_today() -> str:
-        """获取服务器当前的日期 2026-09-20"""
-        now = datetime.now()
-        return now.strftime("%Y-%m-%d")
+    def find_lab_free_slots(lab_id: str | int, date: str, duration: int = 60) -> str:
+        """查询某个实验室某天还能开始预约的时刻。
+
+        date 必须是 YYYY-MM-DD。用户说「今天/明天/后天」时，先调用 get_today 拿到真实日期再传，
+        不要把「明天」这两个字直接传进来。
+        lab_id 可以传数字 id（如 2）或实验室名称（如 人工智能实验室）。
+        本工具只查询，不会创建预约；用户选定某个时刻后，再调用 create_lab_reservation。
+        返回里 slots 是分钟数，labels 是给用户看的 HH:MM。
+        """
+        try:
+            day = datetime.strptime(date.strip(), "%Y-%m-%d").date()
+        except ValueError:
+            return _err(
+                f"日期格式不对：{date}",
+                retryable=False,
+                hint="请按 YYYY-MM-DD 传，例如 2026-11-19；用户说“明天”时先调用 get_today",
+            )
+        try:
+            with _tool_session() as db:
+                resolved, hint = _resolve_lab_id(db, lab_id)
+                if resolved is None:
+                    return _err(hint or f"无法解析实验室 {lab_id}")
+                return reservation_service.get_lab_free_starts(
+                    db, resolved, day, duration
+                )
+            slots = data["slots"]
+            labels = data["labels"]
+            if not slots:
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "count": 0,
+                        "lab_id": resolved,
+                        "date": day.isoformat(),
+                        "duration": duration,
+                        "hint": "该实验室当天已无可约时段，可以建议用户换一天或换一个实验室",
+                    },
+                    ensure_ascii=False,
+                )
+
+            return json.dumps(
+                {
+                    "ok": True,
+                    "count": len(slots),
+                    "lab_id": resolved,
+                    "date": day.isoformat(),
+                    "duration": duration,
+                    "slots": slots[:20],
+                    "labels": labels[:20],
+                    "truncated": len(slots) > 20,
+                },
+                ensure_ascii=False,
+            )
+        except BusinessException as exc:
+            # 实验室不存在、容量未设置这类：改参数有可能成功，允许重试一次
+            return _err(
+                exc.message,
+                retryable=True,
+                hint="按错误信息修正参数后最多重试一次；仍失败就把原因告诉用户",
+            )
+
+        except Exception as exc:
+            logger.exception("find_lab_free_slots 失败 lab_id=%s date=%s", lab_id, date)
+            return _err(str(exc), hint="查询失败，请告诉用户稍后再试，不要重复调用")
 
     return [
         search_lab_docs,
@@ -265,5 +325,5 @@ def build_tools(current_user: User, thread_id: str | None = None):
         list_lab_equipments,
         search_equipments,  # 必须注册，否则 bind_tools 绑不到，模型看不到这个工具
         create_lab_reservation,
-        get_today,
+        find_lab_free_slots,
     ]

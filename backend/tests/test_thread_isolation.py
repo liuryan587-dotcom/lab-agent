@@ -27,7 +27,9 @@ sys.path.insert(0, str(BACKEND_ROOT))
 sys.path.insert(0, str(BACKEND_ROOT / "tests" / "eval"))
 
 # 必须在 import app.* 之前设置：config 在模块加载时就会读它
-DB_PATH = pathlib.Path(tempfile.gettempdir()) / f"lab-agent-thread-test-{os.getpid()}.db"
+DB_PATH = (
+    pathlib.Path(tempfile.gettempdir()) / f"lab-agent-thread-test-{os.getpid()}.db"
+)
 if DB_PATH.exists():
     try:
         DB_PATH.unlink()
@@ -36,7 +38,7 @@ if DB_PATH.exists():
             pathlib.Path(tempfile.gettempdir())
             / f"lab-agent-thread-test-{os.getpid()}-retry.db"
         )
-os.environ["DATABASE_URL"] = "sqlite:///" + DB_PATH.as_posix()
+os.environ.setdefault("DATABASE_URL", "sqlite:///" + DB_PATH.as_posix())
 
 import seed  # noqa: E402
 from langchain_core.messages import AIMessage, HumanMessage  # noqa: E402
@@ -73,7 +75,10 @@ def seed_one_round(db, owner):
         db,
         THREAD,
         owner.id,
-        [HumanMessage(content="人工智能实验室有什么设备？"), AIMessage(content="有一台 RTX5090。")],
+        [
+            HumanMessage(content="人工智能实验室有什么设备？"),
+            AIMessage(content="有一台 RTX5090。"),
+        ],
     )
 
 
@@ -119,9 +124,9 @@ def test_latest_thread_id_is_scoped_by_user():
     try:
         seed_one_round(db, owner)
         assert chat_history_service.latest_thread_id(db, owner.id) == THREAD
-        assert chat_history_service.latest_thread_id(db, other.id) is None, (
-            "别人的最近会话被当成了自己的"
-        )
+        assert (
+            chat_history_service.latest_thread_id(db, other.id) is None
+        ), "别人的最近会话被当成了自己的"
     finally:
         db.close()
 
@@ -144,9 +149,9 @@ def test_other_user_cannot_list_pending_by_thread():
             },
             thread_id=THREAD,
         )
-        assert pending_action_service.list_by_thread(db, other.id, THREAD) == [], (
-            "读到别人的待确认单"
-        )
+        assert (
+            pending_action_service.list_by_thread(db, other.id, THREAD) == []
+        ), "读到别人的待确认单"
         assert len(pending_action_service.list_by_thread(db, owner.id, THREAD)) == 1
     finally:
         db.close()

@@ -5,6 +5,7 @@
 """
 
 import json
+from datetime import datetime, timedelta
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from sqlalchemy.orm import Session
@@ -14,6 +15,12 @@ from app.models.chat_message import ChatMessageRecord
 # 每个 thread 最多回放多少条消息。长对话不能无限塞进上下文，
 # 这里做最朴素的截断：保留最近 N 条。
 MAX_HISTORY_MESSAGES = 40
+
+# 时间敏感的工具：返回结果只在很短时间内有效。
+# 会话恢复时如果把这些旧结果一起回放，模型会把几天前的日期、几天前的空位
+# 当成「现在的事实」——它没有任何办法分辨这些 ToolMessage 是刚查的还是上周查的。
+TIME_SENSITIVE_TOOLS = {"get_today", "find_lab_free_slots"}
+TOOL_RESULT_TTL_MINUTES = 30
 
 
 def _text(content) -> str:
@@ -108,6 +115,44 @@ def append_messages(
     db.commit()
 
 
+def _payload_of(record: ChatMessageRecord) -> dict:
+    try:
+        return json.loads(record.payload or "{}") or {}
+    except ValueError:
+        return {}
+
+
+def _stale_tool_turns(
+    rows: list[ChatMessageRecord], now: datetime | None = None
+) -> tuple[set[int], set[str]]:
+    """找出已经过期的「时间敏感」工具结果。
+
+    返回 (要丢弃的记录 id, 要丢弃的 tool_call_id)。
+
+    为什么两个都要：ToolMessage 不能单独丢。它必须和那条带 tool_calls 的
+    AIMessage 成对处理，否则 OpenAI 兼容接口会直接报
+    "an assistant message with 'tool_calls' must be followed by tool messages"。
+    """
+    now = now or datetime.now()
+    cutoff = now - timedelta(minutes=TOOL_RESULT_TTL_MINUTES)
+    drop_ids: set[int] = set()
+    stale_call_ids: set[str] = set()
+    for row in rows:
+        if row.role != "tool":
+            continue
+        payload = _payload_of(row)
+        if payload.get("name") not in TIME_SENSITIVE_TOOLS:
+            continue
+        created = getattr(row, "create_time", None)
+        # 没有时间戳的老数据一律当作过期：宁可重查一次，也别拿旧事实回答
+        if created is None or created < cutoff:
+            drop_ids.add(row.id)
+            call_id = payload.get("tool_call_id") or ""
+            if call_id:
+                stale_call_ids.add(call_id)
+    return drop_ids, stale_call_ids
+
+
 def load_messages(db: Session, thread_id: str, user_id: int) -> list[BaseMessage]:
     rows = (
         db.query(ChatMessageRecord)
@@ -121,8 +166,30 @@ def load_messages(db: Session, thread_id: str, user_id: int) -> list[BaseMessage
     if not rows:
         return []
     rows = rows[-MAX_HISTORY_MESSAGES:]
-    messages = [to_langchain(row) for row in rows]
-    return [message for message in messages if message is not None]
+
+    drop_ids, stale_call_ids = _stale_tool_turns(rows)
+
+    messages: list[BaseMessage] = []
+    for row in rows:
+        if row.id in drop_ids:
+            continue
+        message = to_langchain(row)
+        if message is None:
+            continue
+        if isinstance(message, AIMessage) and message.tool_calls and stale_call_ids:
+            remaining = [
+                call
+                for call in message.tool_calls
+                if (call.get("id") or "") not in stale_call_ids
+            ]
+            if len(remaining) != len(message.tool_calls):
+                if remaining or (row.content or "").strip():
+                    message = AIMessage(content=row.content or "", tool_calls=remaining)
+                else:
+                    # 这条 assistant 只剩被丢弃的 tool_call，正文也是空的：整条丢掉
+                    continue
+        messages.append(message)
+    return messages
 
 
 def latest_thread_id(db: Session, user_id: int) -> str | None:

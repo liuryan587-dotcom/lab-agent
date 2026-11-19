@@ -1,17 +1,3 @@
-import os
-import sys
-from pathlib import Path
-
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(BACKEND_ROOT))
-
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret")
-os.environ.setdefault("LLM_API_KEY", "test-key")
-os.environ.setdefault("LLM_BASE_URL", "http://localhost:11434/v1")
-os.environ.setdefault("LLM_MODEL", "test-model")
-
-
 import pytest
 from app.common.exceptions import BusinessException
 from app.services.reservation_service import find_free_slots, max_overlap

@@ -1,7 +1,5 @@
 import logging
-import traceback
-
-from requests import session
+from datetime import date
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.common.exceptions import BusinessException
@@ -13,6 +11,8 @@ from app.schemas.reservation import ReservationCreateRequest, ReservationRespons
 from app.common.response import PageResponse
 import asyncio
 from app.database import SessionLocal
+from sqlalchemy.orm import Session
+from app.common.response import Response
 
 # 注意：from fastapi import logger 拿到的是「模块」而不是 logger 实例，
 # 调用 logger.exception() 会抛 AttributeError，反而把真实异常顶掉、掩盖故障原因
@@ -178,6 +178,8 @@ def time_map(slots: list) -> list:
 
 def to_minutes(hhmm: str) -> int:
     """将时间字符串转换为分钟数"""
+    if hhmm is None:
+        raise BusinessException(code=400, message="该实验室未设置开放时间")
     hour, minute = map(int, hhmm.split(":"))
     return hour * 60 + minute
 
@@ -244,6 +246,57 @@ def find_free_slots(
     start_times_hm = time_map(start_times)
     result = {"slots": start_times, "labels": start_times_hm}
     return result
+
+
+def get_lab_free_starts(
+    db: Session,
+    lab_id: int,
+    day: date,
+    duration: int = 60,
+    step: int = 10,
+    buffer: int = 0,
+) -> dict:
+    rows = (
+        db.query(Reservation)
+        .filter(
+            Reservation.lab_id == lab_id,
+            Reservation.date == day,
+            Reservation.status != 2,
+            Reservation.status != 3,
+        )
+        .all()
+    )
+    EXISTING = [
+        (
+            row.start_time.hour * 60 + row.start_time.minute,
+            row.end_time.hour * 60 + row.end_time.minute,
+        )
+        for row in rows
+    ]
+    lab = db.query(Lab).filter(Lab.id == lab_id).first()
+    if lab is None:
+        raise BusinessException(code=404, message=f"实验室{lab_id}不存在")
+    if not lab.capacity or lab.capacity <= 0:
+        raise BusinessException(code=400, message=f"实验室 {lab_id} 未设置容量")
+    capacity = lab.capacity
+    open_start = to_minutes(lab.open_time)
+    open_end = to_minutes(lab.close_time)
+    earliest = open_start
+    if day == date.today():
+        now = datetime.now()
+        earliest = now.hour * 60 + now.minute
+    res = find_free_slots(
+        existing=EXISTING,
+        open_start=open_start,
+        open_end=open_end,
+        duration=duration,
+        step=step,
+        buffer=buffer,
+        capacity=capacity,
+        earliest=earliest,
+    )
+
+    return res
 
 
 def get_reservation_page_list(

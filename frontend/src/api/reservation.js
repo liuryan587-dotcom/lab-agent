@@ -12,6 +12,17 @@ export function createReservationApi(data) {
 }
 
 /**
+ * 查询某天可开始的时段
+ */
+export function getStartsApi(params) {
+  return request({
+    url: '/api/reservation/starts',
+    method: 'get',
+    params
+  })
+}
+
+/**
  * 查询预约记录
  */
 export function getReservationPageList(params) {

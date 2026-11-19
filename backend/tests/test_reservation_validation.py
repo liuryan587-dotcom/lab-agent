@@ -13,11 +13,6 @@ import pytest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret")
-os.environ.setdefault("LLM_API_KEY", "test-key")
-os.environ.setdefault("LLM_BASE_URL", "http://localhost:11434/v1")
-os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.common.exceptions import BusinessException  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
@@ -79,14 +74,18 @@ def raises_message(message, fn):
 def test_create_and_overlap_are_rejected(db):
     session, lab, user = db
     create_reservation(session, user, request(lab.id))
-    raises_message("该时段已预约", lambda: validate_reservation(session, request(lab.id)))
+    raises_message(
+        "该时段已预约", lambda: validate_reservation(session, request(lab.id))
+    )
 
 
 def test_opening_hours_are_enforced(db):
     session, lab, _ = db
     raises_message(
         "预约时间不能早于实验室的开放时间",
-        lambda: validate_reservation(session, request(lab.id, start="07:00", end="08:30")),
+        lambda: validate_reservation(
+            session, request(lab.id, start="07:00", end="08:30")
+        ),
     )
 
 
@@ -94,5 +93,7 @@ def test_invalid_time_range_is_rejected(db):
     session, lab, _ = db
     raises_message(
         "预约时间的结束时间不能小于开始时间",
-        lambda: validate_reservation(session, request(lab.id, start="12:00", end="11:00")),
+        lambda: validate_reservation(
+            session, request(lab.id, start="12:00", end="11:00")
+        ),
     )

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from datetime import date
+from app.common.exceptions import BusinessException
 from app.common.response import Response
 from app.database import get_db
 from app.dependencies.auth import get_current_user, get_current_admin
@@ -38,43 +39,10 @@ def get_reservation_starts(
     step: int = 10,
     buffer: int = 0,
 ):
-    rows = (
-        db.query(Reservation)
-        .filter(
-            Reservation.lab_id == lab_id,
-            Reservation.date == day,
-            Reservation.status != 2,
-            Reservation.status != 3,
-        )
-        .all()
+    data = reservation_service.get_lab_free_starts(
+        db=db, lab_id=lab_id, day=day, duration=slot_duration, step=step, buffer=buffer
     )
-    EXISTING = [
-        (
-            row.start_time.hour * 60 + row.start_time.minute,
-            row.end_time.hour * 60 + row.end_time.minute,
-        )
-        for row in rows
-    ]
-    lab = db.query(Lab).filter(Lab.id == lab_id).first()
-    capacity = lab.capacity
-    open_start = reservation_service.to_minutes(lab.open_time)
-    open_end = reservation_service.to_minutes(lab.close_time)
-    earliest = open_start
-    if day == date.today():
-        now = datetime.now()
-        earliest = now.hour * 60 + now.minute
-    res = reservation_service.find_free_slots(
-        existing=EXISTING,
-        open_start=open_start,
-        open_end=open_end,
-        duration=slot_duration,
-        step=step,
-        buffer=buffer,
-        capacity=capacity,
-        earliest=earliest,
-    )
-
-    return Response.success(data=res)
+    return Response.success(data=data)
 
 
 @router.put("/{reservation_id}/cancel")

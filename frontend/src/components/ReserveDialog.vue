@@ -30,6 +30,25 @@
             style="width: 100%"
           />
         </el-form-item>
+        <el-form-item label="可用时段">
+          <div class="slot-box">
+            <span v-if="slotsLoading" class="slot-hint">加载中…</span>
+            <span v-else-if="!slots.length" class="slot-hint">该日期暂无可约时段</span>
+            <template v-else>
+              <el-tag
+                v-for="label in slots"
+                :key="label"
+                class="slot-tag"
+                :type="form.startTime === label ? 'primary' : 'info'"
+                :effect="form.startTime === label ? 'dark' : 'plain'"
+                @click="pickSlot(label)"
+              >
+                {{ label }}
+              </el-tag>
+              <span class="slot-hint slot-count">共 {{ slots.length }} 个</span>
+            </template>
+          </div>
+        </el-form-item>
         <el-form-item label="开始时间" prop="startTime"
           ><el-time-picker
             v-model="form.startTime"
@@ -61,9 +80,9 @@
 </template>
 
 <script setup>
-import { createReservationApi } from '@/api/reservation'
+import { createReservationApi, getStartsApi } from '@/api/reservation'
 import { ElMessage } from 'element-plus'
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch } from 'vue'
 const props = defineProps({
   visible: Boolean,
   labId: Number,
@@ -82,9 +101,54 @@ const form = reactive({
 })
 const rules = {
   date: [{ required: true, message: '请选择预约日期', trigger: 'change' }],
-  start_time: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
-  end_time: [{ required: true, message: '请选择结束时间', trigger: 'change' }]
+  startTime: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
+  endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }]
 }
+
+// 单次预约时长（分钟）。查可用时段和回填结束时间都用它，避免两处写死不同的值。
+const SLOT_MINUTES = 60
+
+const slots = ref([])
+const slotsLoading = ref(false)
+
+const toMinutes = (hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+const toLabel = (minutes) => {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+const loadSlots = async (day) => {
+  if (!day) {
+    slots.value = []
+    return
+  }
+  slotsLoading.value = true
+  try {
+    const res = await getStartsApi({
+      lab_id: props.labId,
+      day,
+      slot_duration: SLOT_MINUTES
+    })
+    slots.value = res.data?.labels || []
+  } catch {
+    // 请求失败时拦截器已经弹过提示，这里只清空，别让弹窗永远停在"加载中"
+    slots.value = []
+  } finally {
+    slotsLoading.value = false
+  }
+}
+
+const pickSlot = (label) => {
+  form.startTime = label
+  form.endTime = toLabel(toMinutes(label) + SLOT_MINUTES)
+}
+
+watch(() => form.date, loadSlots)
 
 const handleSubmit = async () => {
   const valid = await formRef.value.validate().catch(() => false)
@@ -109,3 +173,27 @@ const handleSubmit = async () => {
   }
 }
 </script>
+
+<style scoped>
+.slot-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-height: 24px;
+}
+
+.slot-tag {
+  margin: 0;
+  cursor: pointer;
+}
+
+.slot-hint {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.slot-count {
+  margin-left: 4px;
+}
+</style>

@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -27,8 +28,8 @@ SYSTEM_PROMPT = """你是智能实验室预约系统的 Agent，回答要简洁�
 2. list_open_labs：查当前开放的实验室
 3. search_equipments：按设备名跨实验室搜索，回答「哪个实验室有 XX 设备」
 4. list_lab_equipments：查某个实验室的设备（已经能确定是哪个实验室时用）
-5. get_today：获取服务器当前日期
-6. create_lab_reservation：生成待确认预约（参数齐了就直接调用）
+5. create_lab_reservation：生成待确认预约（参数齐了就直接调用）
+6. find_lab_free_slots：查询可预约时段
 
 ## 工具参数约定
 查询类工具（list_lab_equipments、search_equipments）可以直接传实验室名称，
@@ -36,7 +37,8 @@ SYSTEM_PROMPT = """你是智能实验室预约系统的 Agent，回答要简洁�
 只有 create_lab_reservation 必须使用数字 ID：缺 ID 时先调 list_open_labs 查到再创建，不要瞎写。
 
 ## 必须遵守
-当用户提到了 今天、明天、后天 等日期相关的问题，请先调用 get_today 来获取日期，**不要直接返回 我需要确定明天的具体日期**。
+今天是几号，看下面「当前时间」那一节，**不要调用 get_today 反复确认，也不要回答「我需要确定明天的具体日期」**。
+用户说「明天」就是当前时间 +1 天，直接换算成具体日期再往下走。
 
 参数（实验室、日期、时间、设备）齐了就直接调用 create_lab_reservation 生成待确认卡片。
 真正的提交由用户点击卡片完成。
@@ -63,7 +65,29 @@ TOOL_LABELS = {
     "search_equipments": "搜索实验设备",
     "create_lab_reservation": "生成待确认预约",
     "get_today": "获取今天日期",
+    "find_lab_free_slots": "查询可预约时段",
 }
+
+
+WEEKDAYS = "一二三四五六日"
+
+
+def _system_prompt() -> str:
+    """每轮现拼系统提示，把「现在几点」写进去。
+
+    日期是服务端已知的事实，不该让模型去调 get_today 查，更不该让它从历史消息里
+    推断——会话恢复时，历史里的日期可能是几天前的，模型会把那天当成今天。
+    """
+    now = datetime.now()
+    return (
+        SYSTEM_PROMPT
+        + "\n## 当前时间\n"
+        + f"现在是 {now:%Y-%m-%d %H:%M}（星期{WEEKDAYS[now.weekday()]}）。\n"
+        + "涉及日期、星期、是否已经过期的判断，一律以这里为准，\n"
+        + "不要从历史消息或历史工具返回里推断今天是几号。\n"
+        + "今天日期、可预约时段这类会随时间变化的信息，必须在本轮重新调用工具获取；\n"
+        + "历史里的同类结果只能用来理解用户意图，不能当作事实。\n"
+    )
 
 
 def _chunk_text(chunk: Any) -> str:
@@ -251,7 +275,8 @@ async def stream_agent(current_user: User, data: ChatRequest):
 
         agent = build_agent(current_user, thread_id)
         # *messages_in：把列表拆开，和 SystemMessage 拼成完整 messages
-        inputs = {"messages": [SystemMessage(content=SYSTEM_PROMPT), *messages_in]}
+        # 系统提示每轮现拼：里面带「当前时间」，避免模型用历史里的旧日期
+        inputs = {"messages": [SystemMessage(content=_system_prompt()), *messages_in]}
 
         # yield = 先交出这一条，函数暂停；前端收到后再继续往下跑
         yield {"type": "status", "message": "正在思考..."}
@@ -377,41 +402,3 @@ def build_agent(current_user: User, thread_id: str | None = None):
     graph.add_edge("tools", "agent")  # 让agent看tool调用的结果
 
     return graph.compile()
-
-
-# def run_agent(db: Session, current_user: User, data: ChatRequest):
-#     """大模型对话"""
-#     if not data.messages:
-#         raise BusinessException(code=400, message="对话内容为空")
-#     history = []
-#     for message in data.messages:
-#         if message.role == "user" and message.content.strip():
-#             history.append(HumanMessage(content=message.content.strip()))
-#         elif message.role == "assistant" and message.content.strip():
-#             history.append(AIMessage(content=message.content.strip()))
-#     if not history:
-#         raise BusinessException(message="请输入您要对话的内容")
-#     agent = build_agent(db, current_user)
-#     try:
-#         result = agent.invoke(
-#             {"messages": [SystemMessage(content=SYSTEM_PROMPT), *history]},
-#             config={"recursion_limit": 10},
-#         )  # 设置对话循环的上限是10轮
-#     except BusinessException:
-#         raise
-#     except Exception as e:
-#         raise BusinessException(code=400, message=f"大模型调用失败:{str(e)}")
-
-#     messages = result.get("messages") or []
-#     if not messages:
-#         raise BusinessException(code=400, message="大模型没有任何返回")
-#     for message in reversed(messages):
-#         if isinstance(message, AIMessage) and message.content.strip():
-#             content = message.content.strip()
-#             if isinstance(content, list):
-#                 content = "".join(
-#                     part.get("text", "") if isinstance(part, dict) else str(part)
-#                     for part in content
-#                 )
-#             if str(content).strip():
-#                 return str(content).strip()
