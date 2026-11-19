@@ -266,13 +266,7 @@ def get_lab_free_starts(
         )
         .all()
     )
-    EXISTING = [
-        (
-            row.start_time.hour * 60 + row.start_time.minute,
-            row.end_time.hour * 60 + row.end_time.minute,
-        )
-        for row in rows
-    ]
+    existing = [_interval(row) for row in rows]
     lab = db.query(Lab).filter(Lab.id == lab_id).first()
     if lab is None:
         raise BusinessException(code=404, message=f"实验室{lab_id}不存在")
@@ -281,12 +275,9 @@ def get_lab_free_starts(
     capacity = lab.capacity
     open_start = to_minutes(lab.open_time)
     open_end = to_minutes(lab.close_time)
-    earliest = open_start
-    if day == date.today():
-        now = datetime.now()
-        earliest = now.hour * 60 + now.minute
+    earliest = _earliest_for(day, open_start)
     res = find_free_slots(
-        existing=EXISTING,
+        existing=existing,
         open_start=open_start,
         open_end=open_end,
         duration=duration,
@@ -297,6 +288,91 @@ def get_lab_free_starts(
     )
 
     return res
+
+
+def _interval(row: Reservation) -> tuple[int, int]:
+    """把一条预约的 start_time/end_time 转成当天的分钟数区间。"""
+    return (
+        row.start_time.hour * 60 + row.start_time.minute,
+        row.end_time.hour * 60 + row.end_time.minute,
+    )
+
+
+def _earliest_for(day: date, open_start: int) -> int:
+    """今天要排除已经过去的时刻，其它日期从开门时间开始。"""
+    if day != date.today():
+        return open_start
+    now = datetime.now()
+    return max(open_start, now.hour * 60 + now.minute)
+
+
+def get_equipment_free_starts(
+    db: Session,
+    equipment_id: int,
+    day: date,
+    duration: int = 60,
+    step: int = 10,
+    buffer: int = 10,
+) -> dict:
+    """某台设备某天还能开始预约的时刻。
+
+    设备是**独占型**资源，和实验室的计数型不同：
+
+    - capacity 固定为 1
+    - 默认留 10 分钟清理时间（buffer），实验室没有这个需求（传 0）
+    - 开放时间沿用设备所属实验室的 open_time / close_time，设备表自己没有
+    """
+    equipment = db.get(Equipment, equipment_id)
+    if equipment is None:
+        raise BusinessException(code=404, message=f"设备{equipment_id}不存在")
+    if equipment.status != 1:
+        raise BusinessException(
+            code=400, message=f"设备「{equipment.name}」维修中，暂不可预约"
+        )
+
+    lab = db.get(Lab, equipment.lab_id)
+    if lab is None:
+        raise BusinessException(
+            code=404, message=f"设备所属实验室{equipment.lab_id}不存在"
+        )
+    if not lab.open_time or not lab.close_time:
+        raise BusinessException(
+            code=400, message=f"实验室「{lab.name}」未设置开放时间"
+        )
+
+    rows = (
+        db.query(Reservation)
+        .filter(
+            Reservation.equipment_id == equipment_id,
+            Reservation.date == day,
+            Reservation.status != 2,
+            Reservation.status != 3,
+        )
+        .all()
+    )
+    existing = [_interval(row) for row in rows]
+
+    open_start = to_minutes(lab.open_time)
+    open_end = to_minutes(lab.close_time)
+
+    res = find_free_slots(
+        existing=existing,
+        open_start=open_start,
+        open_end=open_end,
+        duration=duration,
+        step=step,
+        buffer=buffer,
+        capacity=1,
+        earliest=_earliest_for(day, open_start),
+    )
+
+    return {
+        **res,
+        "equipment_id": equipment.id,
+        "equipment_name": equipment.name,
+        "lab_id": lab.id,
+        "lab_name": lab.name,
+    }
 
 
 def get_reservation_page_list(

@@ -81,6 +81,7 @@
 
 <script setup>
 import { createReservationApi, getStartsApi } from '@/api/reservation'
+import { getEquipmentStartsApi } from '@/api/equipment'
 import { ElMessage } from 'element-plus'
 import { ref, reactive, watch } from 'vue'
 const props = defineProps({
@@ -129,11 +130,17 @@ const loadSlots = async (day) => {
   }
   slotsLoading.value = true
   try {
-    const res = await getStartsApi({
-      lab_id: props.labId,
-      day,
-      slot_duration: SLOT_MINUTES
-    })
+    // 有设备就查设备（独占 + 清理时间），否则查实验室（按容量）
+    const res = props.equipmentId
+      ? await getEquipmentStartsApi(props.equipmentId, {
+          day,
+          duration: SLOT_MINUTES
+        })
+      : await getStartsApi({
+          lab_id: props.labId,
+          day,
+          slot_duration: SLOT_MINUTES
+        })
     slots.value = res.data?.labels || []
   } catch {
     // 请求失败时拦截器已经弹过提示，这里只清空，别让弹窗永远停在"加载中"

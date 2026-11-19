@@ -12,6 +12,17 @@ export function getEquipmentPageList(params) {
 }
 
 /**
+ * 查询某台设备某天还能开始预约的时刻
+ */
+export function getEquipmentStartsApi(equipmentId, params) {
+  return request({
+    url: `/api/equipment/${equipmentId}/starts`,
+    method: 'get',
+    params
+  })
+}
+
+/**
  * 新增
  */
 export function createEquipmentApi(data) {
